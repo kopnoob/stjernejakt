@@ -6,7 +6,8 @@ create table if not exists public.players (
   id          uuid primary key,
   name        text not null,
   color       text not null default '#1f6b43',
-  current_hcp int not null default 5,
+  avatar      text,                       -- valgfri emoji-figur barnet velger
+  current_hcp int not null default 5,     -- utgått: nå lokal enhets-preferanse
   created_at  timestamptz not null default now()
 );
 
@@ -26,17 +27,31 @@ create table if not exists public.rounds (
 create index if not exists idx_rounds_player on public.rounds(player_id);
 create index if not exists idx_rounds_hcp_dist on public.rounds(hcp, distance);
 
--- ── Row Level Security ──────────────────────────────────────────────────────
--- Dette er en privat familie-app uten innlogging. Anon-nøkkelen er offentlig,
--- så vi åpner for full tilgang med anon. Vil du låse den ned senere, bytt
--- til auth-baserte policies.
+-- ── Verdiområde-sjekker (F5) ────────────────────────────────────────────────
+alter table public.rounds
+  add constraint rounds_hcp_chk      check (hcp between 1 and 12)             not valid;
+alter table public.rounds
+  add constraint rounds_distance_chk check (distance between 1 and 300)       not valid;
+alter table public.rounds
+  add constraint rounds_strokes_chk  check (total_strokes between 0 and 200)  not valid;
+alter table public.rounds
+  add constraint rounds_holed_chk    check (holed_count between 0 and 3)      not valid;
+alter table public.rounds
+  add constraint rounds_star_chk     check (star in ('none','bronze','silver','gold')) not valid;
+
+-- ── Row Level Security (E1) ─────────────────────────────────────────────────
+-- Privat familie-app uten innlogging. Anon-nøkkelen er offentlig (og repoet
+-- er åpent), så vi tillater BARE lesing + innsetting. Datamodellen er
+-- insert-only: rader endres aldri, og sletting er en lokal tombstone på
+-- enheten. Dermed trengs verken update- eller delete-tilgang for anon.
 alter table public.players enable row level security;
 alter table public.rounds  enable row level security;
 
 drop policy if exists "players_all" on public.players;
-create policy "players_all" on public.players
-  for all using (true) with check (true);
+drop policy if exists "rounds_all"  on public.rounds;
 
-drop policy if exists "rounds_all" on public.rounds;
-create policy "rounds_all" on public.rounds
-  for all using (true) with check (true);
+create policy "players_select" on public.players for select using (true);
+create policy "players_insert" on public.players for insert with check (true);
+create policy "rounds_select"  on public.rounds  for select using (true);
+create policy "rounds_insert"  on public.rounds  for insert with check (true);
+-- Ingen update/delete-policy ⇒ anon kan verken endre eller slette rader.

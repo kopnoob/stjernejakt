@@ -163,3 +163,114 @@ describe("nextHcpDown", () => {
   it("5 → 4", () => expect(nextHcpDown(5)).toBe(4));
   it("2 (hardeste) → null", () => expect(nextHcpDown(2)).toBe(null));
 });
+
+describe("evaluateRound — allReached / missedGoldBy (A3 nesten i mål)", () => {
+  it("alle hull fullført (ingen pickup) → allReached=true", () => {
+    const r = evaluateRound([holed(6), holed(6), holed(6)], 5, 30);
+    expect(r.allReached).toBe(true);
+  });
+  it("plukket opp → allReached=false", () => {
+    const r = evaluateRound([holed(6), pickup(2), holed(6)], 5, 30);
+    expect(r.allReached).toBe(false);
+  });
+  it("nesten gull via total: 16 mot terskel 15 → missedGoldBy=1", () => {
+    // Ingen i mål-gull (0 holed under hcp? faktisk 7>5 alle over par), total 18..
+    // Konstruer: alle over par men fullført, total 16, terskel 15.
+    const r = evaluateRound([holed(6), holed(5), holed(5)], 5, 30); // 16, 1 holed
+    expect(r.allReached).toBe(true);
+    expect(r.threshold).toBe(15);
+    expect(r.missedGoldBy).toBe(1);
+  });
+  it("gull → missedGoldBy=null", () => {
+    const r = evaluateRound([holed(5), holed(5), holed(5)], 5, 30);
+    expect(r.star).toBe("gold");
+    expect(r.missedGoldBy).toBe(null);
+  });
+  it("plukket opp → missedGoldBy=null (ikke relevant)", () => {
+    const r = evaluateRound([pickup(2), holed(5), holed(5)], 5, 30);
+    expect(r.missedGoldBy).toBe(null);
+  });
+});
+
+describe("evaluateRound — saniterer slagtall", () => {
+  it("negative og ikke-endelige slag teller som 0", () => {
+    const r = evaluateRound(
+      [{ strokes: -3, pickedUp: false }, { strokes: NaN, pickedUp: false }, holed(4)],
+      5,
+      30,
+    );
+    expect(r.totalStrokes).toBe(4);
+  });
+  it("urimelig høye slag klippes til 50", () => {
+    const r = evaluateRound([{ strokes: 9999, pickedUp: false }, holed(0), holed(0)], 5, 30);
+    expect(r.totalStrokes).toBe(50);
+  });
+});
+
+describe("hcpProgress — starPoints (A2 delprestasjon)", () => {
+  const mk = (hcp: number, distance: number, star: Round["star"], total = 10): Round => ({
+    id: Math.random().toString(),
+    player_id: "p1",
+    hcp,
+    distance,
+    star,
+    holed_count: 0,
+    total_strokes: total,
+    holes: [],
+    created_at: new Date().toISOString(),
+  });
+
+  it("summerer poeng (gull=3, sølv=2, bronse=1) for hcp-et", () => {
+    const p = hcpProgress([mk(5, 10, "gold"), mk(5, 20, "silver"), mk(5, 30, "bronze")], 5);
+    expect(p.starPoints).toBe(3 + 2 + 1);
+  });
+  it("teller kun beste pr utslag", () => {
+    const p = hcpProgress([mk(5, 10, "bronze"), mk(5, 10, "gold")], 5);
+    expect(p.starPoints).toBe(3);
+  });
+  it("alle 7 gull → 21 poeng", () => {
+    const rounds = [10, 20, 30, 40, 50, 75, 100].map((d) => mk(5, d, "gold"));
+    expect(hcpProgress(rounds, 5).starPoints).toBe(21);
+  });
+});
+
+describe("hcpProgress — bestGoldStrokesByDistance (A4 personlig rekord)", () => {
+  const mk = (distance: number, star: Round["star"], total: number): Round => ({
+    id: Math.random().toString(),
+    player_id: "p1",
+    hcp: 5,
+    distance,
+    star,
+    holed_count: 0,
+    total_strokes: total,
+    holes: [],
+    created_at: new Date().toISOString(),
+  });
+
+  it("beste (færreste) gull-score pr utslag huskes", () => {
+    const p = hcpProgress([mk(10, "gold", 14), mk(10, "gold", 11), mk(10, "gold", 13)], 5);
+    expect(p.bestGoldStrokesByDistance[10]).toBe(11);
+  });
+  it("ikke-gull runder gir ingen rekord", () => {
+    const p = hcpProgress([mk(10, "silver", 8)], 5);
+    expect(p.bestGoldStrokesByDistance[10]).toBe(null);
+  });
+});
+
+describe("buildMatrix — bestGoldStrokes pr celle", () => {
+  const mk = (star: Round["star"], total: number): Round => ({
+    id: Math.random().toString(),
+    player_id: "p1",
+    hcp: 5,
+    distance: 30,
+    star,
+    holed_count: 0,
+    total_strokes: total,
+    holes: [],
+    created_at: new Date().toISOString(),
+  });
+  it("færreste slag blant gull-runder", () => {
+    const cells = buildMatrix([mk("gold", 14), mk("silver", 9), mk("gold", 12)]);
+    expect(cells.get("5:30")?.bestGoldStrokes).toBe(12);
+  });
+});

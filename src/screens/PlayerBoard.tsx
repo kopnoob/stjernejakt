@@ -1,31 +1,36 @@
 import { useMemo, useState } from "react";
 import StarIcon from "../components/StarIcon";
+import Icon from "../components/Icon";
+import Modal from "../components/Modal";
 import { buildMatrix, hcpProgress, nextHcpDown } from "../rules";
 import type { Player, Round, Star } from "../types";
-import { DISTANCES, DISTANCE_COLOR, HCP_RANGE } from "../types";
+import { DISTANCES, DISTANCE_COLOR, HCP_RANGE, MAX_STARS_PER_HCP } from "../types";
+import { buildDiploma, shareDiploma } from "../lib/diploma";
 
 interface Props {
   player: Player;
   rounds: Round[];
+  currentHcp: number;
   onBack: () => void;
   onStart: (hcp: number, distance: number) => void;
   onSetHcp: (hcp: number) => void;
   onDelete: () => void;
 }
 
-type Mode = "journey" | "overview";
+type Mode = "journey" | "overview" | "history";
 
-export default function PlayerBoard({ player, rounds, onBack, onStart, onSetHcp, onDelete }: Props) {
+export default function PlayerBoard({ player, rounds, currentHcp, onBack, onStart, onSetHcp, onDelete }: Props) {
   const [mode, setMode] = useState<Mode>("journey");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [switchHcp, setSwitchHcp] = useState(false);
+  const [sharing, setSharing] = useState(false);
 
   const playerRounds = useMemo(
     () => rounds.filter((r) => r.player_id === player.id),
     [rounds, player.id],
   );
 
-  const hcp = player.current_hcp;
+  const hcp = currentHcp;
   const prog = useMemo(() => hcpProgress(playerRounds, hcp), [playerRounds, hcp]);
   const downHcp = nextHcpDown(hcp);
 
@@ -36,18 +41,52 @@ export default function PlayerBoard({ player, rounds, onBack, onStart, onSetHcp,
     return set;
   }, [playerRounds]);
 
+  // C1: lag + del diplom for nåværende fremgang i dette hcp-et.
+  async function shareDiplomaNow() {
+    if (sharing) return;
+    setSharing(true);
+    try {
+      const blob = await buildDiploma({
+        name: player.name,
+        avatar: player.avatar ?? null,
+        color: player.color,
+        hcp,
+        goldCount: prog.goldCount,
+        starPoints: prog.starPoints,
+        maxPoints: MAX_STARS_PER_HCP,
+        completed: prog.completed,
+        dateLabel: new Date().toLocaleDateString("nb-NO", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        }),
+        starsByDistance: DISTANCES.map((d) => ({
+          distance: d,
+          star: prog.bestStarByDistance[d] ?? "none",
+        })),
+      });
+      await shareDiploma(blob, player.name);
+    } catch (e) {
+      console.error("[diplom] feilet", e);
+    } finally {
+      setSharing(false);
+    }
+  }
+
   return (
     <div className="screen">
       <header className="topbar">
         <button className="icon-btn" onClick={onBack} aria-label="Tilbake">
-          ‹
+          <Icon name="back" size={22} />
         </button>
         <span className="topbar-title">
-          <span className="dot" style={{ background: player.color }} />
+          <span className="avatar-mini" style={{ background: player.color }}>
+            {player.avatar || player.name.charAt(0).toUpperCase()}
+          </span>
           {player.name}
         </span>
         <button className="icon-btn" onClick={() => setConfirmDelete(true)} aria-label="Mer">
-          ⋯
+          <Icon name="more" size={22} />
         </button>
       </header>
 
@@ -65,9 +104,15 @@ export default function PlayerBoard({ player, rounds, onBack, onStart, onSetHcp,
                 Bytt {switchHcp ? "▴" : "▾"}
               </button>
             </div>
+            {/* A2: stjernepoeng (gull=3, sølv=2, bronse=1) belønner delprestasjon —
+                stolpen fylles også av bronse/sølv, ikke bare gull. */}
             <div className="progress">
-              <div className="progress-fill gold" style={{ width: `${(prog.goldCount / 7) * 100}%` }} />
+              <div
+                className={`progress-fill ${prog.completed ? "gold" : ""}`}
+                style={{ width: `${(prog.starPoints / MAX_STARS_PER_HCP) * 100}%` }}
+              />
             </div>
+            <span className="hcp-points muted tabnum">{prog.starPoints} av {MAX_STARS_PER_HCP} stjernepoeng</span>
           </div>
         </div>
 
@@ -90,7 +135,7 @@ export default function PlayerBoard({ player, rounds, onBack, onStart, onSetHcp,
         )}
       </div>
 
-      {/* Reise / oversikt */}
+      {/* Reise / oversikt / historikk */}
       <div className="mode-toggle">
         <button className={mode === "journey" ? "is-on" : ""} onClick={() => setMode("journey")}>
           Reise
@@ -98,9 +143,12 @@ export default function PlayerBoard({ player, rounds, onBack, onStart, onSetHcp,
         <button className={mode === "overview" ? "is-on" : ""} onClick={() => setMode("overview")}>
           Oversikt
         </button>
+        <button className={mode === "history" ? "is-on" : ""} onClick={() => setMode("history")}>
+          Historikk
+        </button>
       </div>
 
-      {mode === "journey" ? (
+      {mode === "journey" && (
         <Journey
           hcp={hcp}
           prog={prog}
@@ -108,31 +156,39 @@ export default function PlayerBoard({ player, rounds, onBack, onStart, onSetHcp,
           onStart={(d) => onStart(hcp, d)}
           onGoDown={() => downHcp && onSetHcp(downHcp)}
         />
-      ) : (
+      )}
+      {mode === "overview" && (
         <OverviewGrid playerRounds={playerRounds} currentHcp={hcp} onStart={onStart} />
       )}
+      {mode === "history" && <History rounds={playerRounds} />}
+
+      {/* C1: del diplom */}
+      <button className="btn btn-ghost btn-share" onClick={shareDiplomaNow} disabled={sharing}>
+        <Icon name="share" size={18} />
+        {sharing ? "Lager diplom …" : "Del diplom"}
+      </button>
 
       {confirmDelete && (
-        <div className="sheet-backdrop" onClick={() => setConfirmDelete(false)}>
-          <div className="sheet" onClick={(e) => e.stopPropagation()}>
-            <p className="sheet-title">Slette {player.name}?</p>
-            <p className="muted">Alle runder og stjerner forsvinner. Dette kan ikke angres.</p>
-            <div className="add-actions">
-              <button className="btn btn-ghost" onClick={() => setConfirmDelete(false)}>
-                Avbryt
-              </button>
-              <button
-                className="btn btn-danger"
-                onClick={() => {
-                  setConfirmDelete(false);
-                  onDelete();
-                }}
-              >
-                Slett
-              </button>
-            </div>
+        <Modal onClose={() => setConfirmDelete(false)} labelledBy="delete-title">
+          <p className="sheet-title" id="delete-title">
+            Slette {player.name}?
+          </p>
+          <p className="muted">Alle runder og stjerner forsvinner. Dette kan ikke angres.</p>
+          <div className="add-actions">
+            <button className="btn btn-ghost" onClick={() => setConfirmDelete(false)}>
+              Avbryt
+            </button>
+            <button
+              className="btn btn-danger"
+              onClick={() => {
+                setConfirmDelete(false);
+                onDelete();
+              }}
+            >
+              Slett
+            </button>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );
@@ -177,6 +233,7 @@ function Journey({
       <div className="journey">
         {DISTANCES.map((d) => {
           const star: Star = prog.bestStarByDistance[d] ?? "none";
+          const pr = prog.bestGoldStrokesByDistance[d];
           const isNext = d === prog.nextDistance;
           const isFuture = prog.nextDistance !== null && d > prog.nextDistance && star === "none";
           return (
@@ -192,7 +249,12 @@ function Journey({
               <span className="step-mid">
                 {isNext && <span className="next-tag">Neste</span>}
                 {isNext && star !== "none" && <StarIcon variant={star} size={18} outline={false} />}
-                {!isNext && <span className="step-star-label muted">{starLabel(star)}</span>}
+                {/* A4: vis personlig rekord på fullførte gull-utslag. */}
+                {!isNext && star === "gold" && pr != null ? (
+                  <span className="step-pr">🏆 rekord {pr} slag</span>
+                ) : (
+                  !isNext && <span className="step-star-label muted">{starLabel(star)}</span>
+                )}
               </span>
               <span className="step-right">
                 {isNext ? (
@@ -267,6 +329,67 @@ function OverviewGrid({
       </table>
     </div>
   );
+}
+
+// ─── Historikk: tidslinje av runder (C3) ───────────────────────────────────
+
+function History({ rounds }: { rounds: Round[] }) {
+  // Nyeste først.
+  const sorted = useMemo(
+    () => [...rounds].sort((a, b) => b.created_at.localeCompare(a.created_at)),
+    [rounds],
+  );
+
+  if (sorted.length === 0) {
+    return (
+      <div className="empty history-empty">
+        <p>Ingen runder ennå.</p>
+        <p className="muted">Spill en runde så dukker den opp her – nyeste øverst.</p>
+      </div>
+    );
+  }
+
+  // Gruppér på dato (lokal).
+  const groups: { day: string; items: Round[] }[] = [];
+  for (const r of sorted) {
+    const day = formatDay(r.created_at);
+    const last = groups[groups.length - 1];
+    if (last && last.day === day) last.items.push(r);
+    else groups.push({ day, items: [r] });
+  }
+
+  return (
+    <div className="history">
+      {groups.map((g) => (
+        <div key={g.day} className="history-group">
+          <div className="history-day muted">{g.day}</div>
+          {g.items.map((r) => (
+            <div key={r.id} className="history-row">
+              <span className="history-cone" style={{ background: DISTANCE_COLOR[r.distance] }} />
+              <span className="history-dist">{r.distance} m</span>
+              <span className="history-hcp muted">hcp {r.hcp}</span>
+              <span className="history-detail muted tabnum">
+                {r.holed_count}/3 i mål · {r.total_strokes} slag
+              </span>
+              <span className="history-star">
+                {r.star === "none" ? (
+                  <span className="cell-dash">·</span>
+                ) : (
+                  <StarIcon variant={r.star} size={22} outline={false} />
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function formatDay(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "Tidligere";
+  return d.toLocaleDateString("nb-NO", { weekday: "long", day: "numeric", month: "long" });
 }
 
 function starLabel(star: Star): string {

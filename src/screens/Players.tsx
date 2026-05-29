@@ -2,31 +2,36 @@ import { useMemo, useState } from "react";
 import StarIcon from "../components/StarIcon";
 import { hcpProgress } from "../rules";
 import type { Player, Round } from "../types";
-import { PLAYER_COLORS } from "../types";
+import { PLAYER_AVATARS, PLAYER_COLORS } from "../types";
+import type { SyncState } from "../useApp";
 
 interface Props {
   players: Player[];
   rounds: Round[];
   backend: "supabase" | "local";
+  syncState: SyncState;
+  getHcp: (playerId: string) => number;
   onOpen: (playerId: string) => void;
-  onAdd: (name: string, color: string) => Promise<Player>;
+  onAdd: (name: string, color: string, avatar: string | null) => Promise<Player>;
 }
 
-export default function Players({ players, rounds, backend, onOpen, onAdd }: Props) {
+export default function Players({ players, rounds, backend, syncState, getHcp, onOpen, onAdd }: Props) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [color, setColor] = useState(PLAYER_COLORS[0]);
+  const [avatar, setAvatar] = useState<string | null>(null);
 
   // Per spiller: nåværende hcp + antall gull i det hcp-et (mer relevant
-  // enn totalt antall stjerner).
+  // enn totalt antall stjerner). current_hcp er lokal (getHcp).
   const progByPlayer = useMemo(() => {
     const m = new Map<string, { hcp: number; gold: number }>();
     for (const p of players) {
-      const pr = hcpProgress(rounds.filter((r) => r.player_id === p.id), p.current_hcp);
-      m.set(p.id, { hcp: p.current_hcp, gold: pr.goldCount });
+      const hcp = getHcp(p.id);
+      const pr = hcpProgress(rounds.filter((r) => r.player_id === p.id), hcp);
+      m.set(p.id, { hcp, gold: pr.goldCount });
     }
     return m;
-  }, [players, rounds]);
+  }, [players, rounds, getHcp]);
 
   // Foreslå neste ledige farge for ny spiller.
   function openAdd() {
@@ -34,13 +39,14 @@ export default function Players({ players, rounds, backend, onOpen, onAdd }: Pro
     const next = PLAYER_COLORS.find((c) => !used.has(c)) ?? PLAYER_COLORS[0];
     setColor(next);
     setName("");
+    setAvatar(null);
     setAdding(true);
   }
 
   async function submit() {
     const trimmed = name.trim();
     if (!trimmed) return;
-    const p = await onAdd(trimmed, color);
+    const p = await onAdd(trimmed, color, avatar);
     setAdding(false);
     onOpen(p.id);
   }
@@ -60,15 +66,22 @@ export default function Players({ players, rounds, backend, onOpen, onAdd }: Pro
       <div className="list">
         {players.length === 0 && !adding && (
           <div className="empty">
-            <p>Ingen spillere ennå.</p>
-            <p className="muted">Legg til barna dine for å begynne å samle stjerner.</p>
+            <div className="empty-stars" aria-hidden="true">
+              <StarIcon variant="bronze" size={30} />
+              <StarIcon variant="gold" size={42} />
+              <StarIcon variant="silver" size={30} />
+            </div>
+            <p className="empty-title">Klar for stjernejakt?</p>
+            <p className="muted">
+              Legg til barna og start jakten på bronse, sølv og gull – ett utslag av gangen.
+            </p>
           </div>
         )}
 
         {players.map((p) => (
           <button key={p.id} className="player-card" onClick={() => onOpen(p.id)}>
             <span className="avatar" style={{ background: p.color }}>
-              {p.name.charAt(0).toUpperCase()}
+              {p.avatar ? p.avatar : p.name.charAt(0).toUpperCase()}
             </span>
             <span className="player-card-info">
               <span className="player-card-name">{p.name}</span>
@@ -85,15 +98,35 @@ export default function Players({ players, rounds, backend, onOpen, onAdd }: Pro
 
         {adding ? (
           <div className="add-form">
+            <div className="add-preview">
+              <span className="avatar avatar-lg" style={{ background: color }}>
+                {avatar ? avatar : (name.trim().charAt(0).toUpperCase() || "?")}
+              </span>
+            </div>
             <input
               className="text-input"
-              placeholder="Navn på spiller"
+              placeholder="Fornavn eller kallenavn"
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoFocus
               maxLength={20}
               onKeyDown={(e) => e.key === "Enter" && submit()}
             />
+            <span className="field-label muted">Velg figur</span>
+            <div className="avatar-row">
+              {PLAYER_AVATARS.map((a) => (
+                <button
+                  key={a}
+                  className={`avatar-pick ${avatar === a ? "is-selected" : ""}`}
+                  onClick={() => setAvatar((cur) => (cur === a ? null : a))}
+                  aria-label={`Velg figur ${a}`}
+                  aria-pressed={avatar === a}
+                >
+                  {a}
+                </button>
+              ))}
+            </div>
+            <span className="field-label muted">Velg farge</span>
             <div className="color-row">
               {PLAYER_COLORS.map((c) => (
                 <button
@@ -122,7 +155,15 @@ export default function Players({ players, rounds, backend, onOpen, onAdd }: Pro
       </div>
 
       <footer className="storage-note">
-        {backend === "supabase" ? "Lagres i skyen (Supabase)" : "Lagres på denne enheten"}
+        {backend === "supabase" ? (
+          <span className={`sync-pill sync-${syncState}`}>
+            {syncState === "syncing" && "Synkroniserer …"}
+            {syncState === "synced" && "Lagret i skyen"}
+            {syncState === "local" && "Lagret på enheten (synkes senere)"}
+          </span>
+        ) : (
+          "Lagres på denne enheten"
+        )}
       </footer>
     </div>
   );

@@ -21,11 +21,14 @@ export interface HoleResult {
 export interface Player {
   id: string;
   name: string;
-  /** Hex-farge for avatar/identitet. */
+  /** Hex-farge for avatar-bakgrunn. */
   color: string;
-  /** Handicapet boardet fokuserer på nå. Default 5 (vanlig start). */
-  current_hcp: number;
+  /** Emoji-figur barnet velger selv (valgfri; fallback = forbokstav). */
+  avatar?: string | null;
   created_at: string;
+  // Merk: "current_hcp" er flyttet til en lokal enhets-preferanse
+  // (se store.ts getCurrentHcp), ikke et delt felt — hindrer at flere
+  // enheter overskriver hverandres "hvor er jeg"-peker.
 }
 
 export interface Round {
@@ -81,3 +84,9 @@ export const PLAYER_COLORS = [
   "#7a5cc0", // lilla
   "#e0a52e", // gul
 ];
+
+/** Emoji-figurer barnet kan velge som avatar. */
+export const PLAYER_AVATARS = ["🦊", "🐻", "🐰", "🦁", "🐯", "🐸", "🐧", "🦄", "🐢", "🦉", "🐝", "⛳"];
+
+/** Stjernepoeng per nivå (for delprestasjon-progresjon). */
+export const MAX_STARS_PER_HCP = DISTANCES.length * 3; // 21

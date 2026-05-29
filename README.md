@@ -14,20 +14,24 @@ av økter.
 
 ## Slik spiller du
 
-1. Legg til barna som spillere.
-2. Trykk på en rute i stjerne-matrisen (handicap × utslag) for å starte en runde.
-3. For hvert av de tre hullene: trykk antall slag det tok å komme i mål,
-   eller **Over** (i mål, men flere slag enn handicap) / **Bom** (kom ikke i mål).
-4. Når alle tre hull er registrert, trykk **Lagre**. Stjernen havner i matrisen.
+1. Legg til barna som spillere — velg en figur og farge, og skriv fornavn/kallenavn.
+2. Hver spiller har en **reise**: start på 10 m og jobb deg utover. Trykk «Spill»
+   på neste utslag for å starte en runde.
+3. For hvert av de tre hullene: bruk **+ / −** for å sette antall slag, eller
+   **Plukk opp** (✕) hvis hullet ikke ble fullført.
+4. Trykk **Lagre** — barnet får sin egen feiring med stjerne, lyd og konfetti.
+   Klarer du gull på alle sju utslag, rykker du ned til et hardere handicap.
 
 **Stjerneregler (som original Stjernejakt):**
 
 - 1 hull i mål → 🥉 bronse
 - 2 hull i mål → 🥈 sølv
 - 3 hull i mål → 🥇 gull
-- I tillegg: gull hvis totalt antall slag ≤ 3 × handicap
+- I tillegg: gull hvis totalt antall slag ≤ 3 × handicap (men ikke hvis et hull
+  ble plukket opp)
 
 Et hull teller bare som «i mål» hvis ballen nådde ringen **innen** handicap-slag.
+Du kan også se en **historikk** per spiller og dele et **diplom** med fremgangen.
 
 ---
 
@@ -55,6 +59,14 @@ og økter.
 
 Uten Supabase fungerer alt fint — da lagres data kun lokalt i nettleseren.
 
+**Sikkerhet (RLS):** datamodellen er *insert-only* — rader endres aldri, og
+sletting er en lokal tombstone på enheten. Derfor tillater
+[`schema.sql`](supabase/schema.sql) kun **lesing + innsetting** for anon-nøkkelen
+(ingen update/delete), selv om nøkkelen er offentlig i dette åpne repoet.
+
+**Rydde testdata:** kjør [`supabase/cleanup-testdata.sql`](supabase/cleanup-testdata.sql)
+i SQL Editor for å fjerne test-spillere.
+
 ---
 
 ## Utvikling
@@ -76,6 +88,8 @@ Aktiver Pages én gang under **Settings → Pages → Source: GitHub Actions**.
 ## Teknisk
 
 - **React + TypeScript + Vite** — bygger til statiske filer
+- **PWA** (vite-plugin-pwa): installerbar, offline-skall via service worker
+- **Self-hostede fonter** (@fontsource: Fredoka + Inter) — ingen Google-kall
 - **Supabase** for skylagring (med localStorage som offline-cache/fallback)
 - Ingen ekstern UI-ramme — håndlaget CSS med varm, mobil-først stil
 - Bygd som et lett supplement til den fulle simulator-appen `golf-coach-r50`

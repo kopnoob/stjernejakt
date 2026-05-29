@@ -1,3 +1,4 @@
+import { useId } from "react";
 import type { Star } from "../types";
 
 interface Props {
@@ -7,17 +8,22 @@ interface Props {
   outline?: boolean;
 }
 
-const FILL: Record<Star, string> = {
-  none: "transparent",
-  bronze: "var(--bronze)",
-  silver: "var(--silver)",
-  gold: "var(--gold)",
+// G1: metallisk dybde via to-tonet gradient + spekulær glans.
+const METAL: Record<Exclude<Star, "none">, [string, string, string]> = {
+  // [topp-lys, midt, bunn-skygge]
+  gold: ["#fde9a6", "#efb014", "#b07c0a"],
+  silver: ["#f4f6f8", "#9aa6ad", "#6c777e"],
+  bronze: ["#ecbd8f", "#c77b3c", "#8a5020"],
 };
 
-/** Fem-takket stjerne. Brukes overalt for å vise resultat-nivå. */
+/** Fem-takket stjerne med metallisk finish. Brukes overalt for resultat-nivå. */
 export default function StarIcon({ variant, size = 24, outline = true }: Props) {
+  const uid = useId();
+  const gid = `star-${uid}`;
   const points = starPoints(50, 50, 48, 20, 5);
   const isNone = variant === "none";
+  const metal = isNone ? null : METAL[variant];
+
   return (
     <svg
       width={size}
@@ -26,18 +32,29 @@ export default function StarIcon({ variant, size = 24, outline = true }: Props) 
       aria-hidden="true"
       style={{ display: "block", overflow: "visible" }}
     >
+      {metal && (
+        <defs>
+          <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={metal[0]} />
+            <stop offset="48%" stopColor={metal[1]} />
+            <stop offset="100%" stopColor={metal[2]} />
+          </linearGradient>
+        </defs>
+      )}
       <polygon
         points={points}
-        fill={isNone ? "transparent" : FILL[variant]}
-        stroke={isNone ? (outline ? "var(--line)" : "transparent") : "rgba(0,0,0,0.18)"}
+        fill={isNone ? "transparent" : `url(#${gid})`}
+        stroke={isNone ? (outline ? "var(--line)" : "transparent") : "rgba(0,0,0,0.22)"}
         strokeWidth={isNone ? 4 : 2.5}
         strokeLinejoin="round"
       />
       {!isNone && (
-        <polygon
-          points={starPoints(50, 44, 26, 11, 5)}
-          fill="rgba(255,255,255,0.35)"
-        />
+        <>
+          {/* Øvre glans */}
+          <polygon points={starPoints(50, 43, 27, 11, 5)} fill="rgba(255,255,255,0.42)" />
+          {/* Liten spekulær prikk */}
+          <circle cx="38" cy="34" r="5" fill="rgba(255,255,255,0.55)" />
+        </>
       )}
     </svg>
   );

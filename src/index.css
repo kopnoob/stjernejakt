@@ -16,11 +16,13 @@
   --green-600: #1a5c3a;
   --green-300: #4f9b6e;
   --green-tint: #e4efe6;
+  --green-grad: linear-gradient(180deg, #2c8055, #1f6b43 70%);
+  --gold-grad: linear-gradient(180deg, #f6c648, #e7a40f);
 
-  /* Tekst */
+  /* Tekst (H4: hevet kontrast på de svake nivåene) */
   --ink: #20342a;           /* dyp grønn-kull */
-  --ink-2: #5c6b62;         /* dempet */
-  --ink-3: #8a948c;         /* svak */
+  --ink-2: #4f5d54;         /* dempet — ~7:1 mot kort */
+  --ink-3: #6c776e;         /* svak — ~4.6:1 mot kort (var #8a948c) */
 
   /* Stjerne-metaller */
   --bronze: #c77b3c;

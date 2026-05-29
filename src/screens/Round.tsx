@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import StarIcon from "../components/StarIcon";
+import Icon from "../components/Icon";
 import ResultOverlay from "../components/ResultOverlay";
 import { evaluateRound } from "../rules";
 import type { HoleResult, Player } from "../types";
@@ -9,6 +10,8 @@ interface Props {
   player: Player;
   initialHcp: number;
   initialDistance: number;
+  /** Beste gull-score (færrest slag) pr utslag på dette hcp FØR runden — for A4-rekord. */
+  recordsByDistance: Record<number, number | null>;
   onSave: (hcp: number, distance: number, holes: HoleResult[]) => Promise<void>;
   onBack: () => void;
 }
@@ -20,15 +23,28 @@ const freshHoles = (): HoleResult[] => [
   { strokes: 0, pickedUp: false },
 ];
 
-export default function Round({ player, initialHcp, initialDistance, onSave, onBack }: Props) {
+export default function Round({
+  player,
+  initialHcp,
+  initialDistance,
+  recordsByDistance,
+  onSave,
+  onBack,
+}: Props) {
   // Hcp er fast for runden (valgt på boardet før start) — flyten er ledende,
   // så vi redigerer ikke hcp midt i runden.
   const hcp = initialHcp;
   const [distance, setDistance] = useState(initialDistance);
+  // Frys rekord-tabellen ved oppstart (hcp er fast hele runden), slik at A4
+  // vurderer mot historikk FØR denne runden ble lagret — ellers ville lagring
+  // oppdatere props og «ny rekord» forsvinne. useState-initialisator fanger
+  // verdien én gang (settes aldri på nytt).
+  const [priorRecords] = useState(() => recordsByDistance);
   // Slagene beholdes hvis man bytter utslag — man retter ofte opp en feil
   // eller ombestemmer seg midt i runden.
   const [holes, setHoles] = useState<HoleResult[]>(freshHoles);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   function bumpStrokes(i: number, delta: number) {
     setHoles((prev) => {
@@ -62,19 +78,31 @@ export default function Round({ player, initialHcp, initialDistance, onSave, onB
     return evaluateRound(holes, hcp, distance);
   }, [allSet, holes, hcp, distance]);
 
+  // A4: ny personlig rekord = gull med færre slag enn beste tidligere gull
+  // (eller første gull noensinne på dette utslaget).
+  const isNewRecord =
+    finalResult?.star === "gold" &&
+    (priorRecords[distance] == null || finalResult.totalStrokes < priorRecords[distance]!);
+
   const threshold = 3 * hcp;
 
   async function handleSave() {
-    if (!allSet) return;
-    setSaved(true);
-    await onSave(hcp, distance, holes);
+    // F3: lås mot dobbel-lagring (rask dobbelttrykk → to runder).
+    if (!allSet || saving || saved) return;
+    setSaving(true);
+    try {
+      await onSave(hcp, distance, holes);
+      setSaved(true); // viser feiringen først når lagring er fullført
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
     <div className="screen round-screen">
       <header className="topbar">
         <button className="icon-btn" onClick={onBack} aria-label="Tilbake">
-          ‹
+          <Icon name="back" size={22} />
         </button>
         <span className="topbar-title topbar-title-stack">
           <span className="topbar-name">
@@ -140,13 +168,24 @@ export default function Round({ player, initialHcp, initialDistance, onSave, onB
             {anyPickedUp ? " · plukket opp" : ` · ${totalStrokes}/${threshold} slag`}
           </span>
         )}
-        <button className="btn btn-primary btn-save" disabled={!allSet} onClick={handleSave}>
-          Lagre
+        <button
+          className="btn btn-primary btn-save"
+          disabled={!allSet || saving || saved}
+          onClick={handleSave}
+        >
+          {saving ? "Lagrer …" : "Lagre"}
         </button>
       </div>
 
       {saved && finalResult && (
-        <ResultOverlay result={finalResult} hcp={hcp} distance={distance} onDone={onBack} />
+        <ResultOverlay
+          result={finalResult}
+          hcp={hcp}
+          distance={distance}
+          playerName={player.name}
+          isNewRecord={isNewRecord}
+          onDone={onBack}
+        />
       )}
     </div>
   );
@@ -172,7 +211,7 @@ function HoleCard({
     ? { txt: "Plukket opp", cls: "st-fail" }
     : hole.strokes <= hcp
     ? { txt: `I mål · ${hole.strokes} slag`, cls: "st-holed" }
-    : { txt: `Over par · ${hole.strokes} slag`, cls: "st-over" };
+    : { txt: `Fullført · ${hole.strokes} slag`, cls: "st-over" };
 
   return (
     <div className={`hole-card ${isSet ? "is-set" : ""} ${hole.pickedUp ? "is-pickup" : ""}`}>
