@@ -107,11 +107,6 @@ export default function Round({ player, initialHcp, initialDistance, onSave, onB
                 key={v}
                 className={`chip chip-dist ${distance === v ? "is-active" : ""}`}
                 onClick={() => setDistance(v)}
-                style={
-                  distance === v
-                    ? { borderColor: DISTANCE_COLOR[v], background: DISTANCE_COLOR[v], color: "#10231a" }
-                    : undefined
-                }
               >
                 <span className="cone-sm" style={{ background: DISTANCE_COLOR[v] }} />
                 {v}m
