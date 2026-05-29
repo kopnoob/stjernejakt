@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import StarIcon from "../components/StarIcon";
-import { totalStars } from "../rules";
+import { hcpProgress } from "../rules";
 import type { Player, Round } from "../types";
 import { PLAYER_COLORS } from "../types";
 
@@ -17,9 +17,14 @@ export default function Players({ players, rounds, backend, onOpen, onAdd }: Pro
   const [name, setName] = useState("");
   const [color, setColor] = useState(PLAYER_COLORS[0]);
 
-  const starsByPlayer = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const p of players) m.set(p.id, totalStars(rounds.filter((r) => r.player_id === p.id)));
+  // Per spiller: nåværende hcp + antall gull i det hcp-et (mer relevant
+  // enn totalt antall stjerner).
+  const progByPlayer = useMemo(() => {
+    const m = new Map<string, { hcp: number; gold: number }>();
+    for (const p of players) {
+      const pr = hcpProgress(rounds.filter((r) => r.player_id === p.id), p.current_hcp);
+      m.set(p.id, { hcp: p.current_hcp, gold: pr.goldCount });
+    }
     return m;
   }, [players, rounds]);
 
@@ -65,9 +70,14 @@ export default function Players({ players, rounds, backend, onOpen, onAdd }: Pro
             <span className="avatar" style={{ background: p.color }}>
               {p.name.charAt(0).toUpperCase()}
             </span>
-            <span className="player-card-name">{p.name}</span>
+            <span className="player-card-info">
+              <span className="player-card-name">{p.name}</span>
+              <span className="player-card-sub muted">
+                Handicap {progByPlayer.get(p.id)?.hcp ?? 5}
+              </span>
+            </span>
             <span className="player-card-stars tabnum">
-              {starsByPlayer.get(p.id) ?? 0}
+              {progByPlayer.get(p.id)?.gold ?? 0}/7
               <StarIcon variant="gold" size={18} />
             </span>
           </button>

@@ -11,7 +11,7 @@
 //   MEN bare hvis ingen hull er plukket opp (man må ha fullført alle).
 
 import type { HoleResult, HoleStatus, Round, Star } from "./types";
-import { STAR_RANK } from "./types";
+import { DISTANCES, HCP_RANGE, STAR_RANK } from "./types";
 
 export function holeStatus(hole: HoleResult, hcp: number): HoleStatus {
   if (hole.pickedUp) return "failed";
@@ -75,4 +75,42 @@ export function totalStars(rounds: Round[]): number {
   let total = 0;
   for (const c of cells.values()) total += STAR_RANK[c.best];
   return total;
+}
+
+// ─── Fremgang i ett handicap (den fokuserte "reisen") ─────────────────────
+
+export interface HcpProgress {
+  hcp: number;
+  /** Beste stjerne pr utslag for dette hcp-et. */
+  bestStarByDistance: Record<number, Star>;
+  /** Antall utslag med gull. */
+  goldCount: number;
+  /** Neste anbefalte utslag (laveste uten gull), eller null hvis alt er gull. */
+  nextDistance: number | null;
+  /** Alle 7 utslag har gull. */
+  completed: boolean;
+}
+
+export function hcpProgress(rounds: Round[], hcp: number): HcpProgress {
+  const best: Record<number, Star> = {};
+  for (const d of DISTANCES) best[d] = "none";
+  for (const r of rounds) {
+    if (r.hcp !== hcp) continue;
+    best[r.distance] = maxStar(best[r.distance] ?? "none", r.star);
+  }
+  const goldCount = DISTANCES.filter((d) => best[d] === "gold").length;
+  const nextDistance = DISTANCES.find((d) => best[d] !== "gold") ?? null;
+  return {
+    hcp,
+    bestStarByDistance: best,
+    goldCount,
+    nextDistance,
+    completed: nextDistance === null,
+  };
+}
+
+/** Neste (lavere/hardere) handicap, eller null hvis allerede på det hardeste. */
+export function nextHcpDown(hcp: number): number | null {
+  const min = Math.min(...HCP_RANGE);
+  return hcp > min ? hcp - 1 : null;
 }

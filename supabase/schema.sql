@@ -6,6 +6,7 @@ create table if not exists public.players (
   id          uuid primary key,
   name        text not null,
   color       text not null default '#1f6b43',
+  current_hcp int not null default 5,
   created_at  timestamptz not null default now()
 );
 

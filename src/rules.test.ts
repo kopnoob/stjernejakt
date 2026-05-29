@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildMatrix, evaluateRound, holeStatus, totalStars } from "./rules";
+import { buildMatrix, evaluateRound, hcpProgress, holeStatus, nextHcpDown, totalStars } from "./rules";
 import type { HoleResult, Round } from "./types";
 
 // Hjelpere for å lage hull kort.
@@ -113,4 +113,53 @@ describe("matrise og totalsum", () => {
     const rounds = [mk(5, 30, "gold"), mk(5, 30, "gold"), mk(5, 30, "silver")];
     expect(totalStars(rounds)).toBe(3);
   });
+});
+
+describe("hcpProgress — fokusert reise", () => {
+  const mk = (hcp: number, distance: number, star: Round["star"]): Round => ({
+    id: Math.random().toString(),
+    player_id: "p1",
+    hcp,
+    distance,
+    star,
+    holed_count: 0,
+    total_strokes: 10,
+    holes: [],
+    created_at: new Date().toISOString(),
+  });
+
+  it("ingen runder → neste er 10m, 0 gull", () => {
+    const p = hcpProgress([], 5);
+    expect(p.goldCount).toBe(0);
+    expect(p.nextDistance).toBe(10);
+    expect(p.completed).toBe(false);
+  });
+  it("gull på 10 og 20 → neste er 30m", () => {
+    const p = hcpProgress([mk(5, 10, "gold"), mk(5, 20, "gold")], 5);
+    expect(p.goldCount).toBe(2);
+    expect(p.nextDistance).toBe(30);
+  });
+  it("sølv på 10 (ikke gull) → 10m er fortsatt neste", () => {
+    const p = hcpProgress([mk(5, 10, "silver")], 5);
+    expect(p.goldCount).toBe(0);
+    expect(p.nextDistance).toBe(10);
+    expect(p.bestStarByDistance[10]).toBe("silver");
+  });
+  it("runder på annet hcp teller ikke", () => {
+    const p = hcpProgress([mk(4, 10, "gold"), mk(4, 20, "gold")], 5);
+    expect(p.goldCount).toBe(0);
+    expect(p.nextDistance).toBe(10);
+  });
+  it("gull på alle 7 → completed, ingen neste", () => {
+    const rounds = [10, 20, 30, 40, 50, 75, 100].map((d) => mk(5, d, "gold"));
+    const p = hcpProgress(rounds, 5);
+    expect(p.goldCount).toBe(7);
+    expect(p.completed).toBe(true);
+    expect(p.nextDistance).toBe(null);
+  });
+});
+
+describe("nextHcpDown", () => {
+  it("5 → 4", () => expect(nextHcpDown(5)).toBe(4));
+  it("2 (hardeste) → null", () => expect(nextHcpDown(2)).toBe(null));
 });

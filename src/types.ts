@@ -23,6 +23,8 @@ export interface Player {
   name: string;
   /** Hex-farge for avatar/identitet. */
   color: string;
+  /** Handicapet boardet fokuserer på nå. Default 5 (vanlig start). */
+  current_hcp: number;
   created_at: string;
 }
 

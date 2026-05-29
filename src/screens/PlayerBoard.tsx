@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import StarIcon from "../components/StarIcon";
-import { buildMatrix, totalStars } from "../rules";
+import { buildMatrix, hcpProgress, nextHcpDown } from "../rules";
 import type { Player, Round, Star } from "../types";
 import { DISTANCES, DISTANCE_COLOR, HCP_RANGE } from "../types";
 
@@ -9,30 +9,32 @@ interface Props {
   rounds: Round[];
   onBack: () => void;
   onStart: (hcp: number, distance: number) => void;
+  onSetHcp: (hcp: number) => void;
   onDelete: () => void;
 }
 
-export default function PlayerBoard({ player, rounds, onBack, onStart, onDelete }: Props) {
+type Mode = "journey" | "overview";
+
+export default function PlayerBoard({ player, rounds, onBack, onStart, onSetHcp, onDelete }: Props) {
+  const [mode, setMode] = useState<Mode>("journey");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [switchHcp, setSwitchHcp] = useState(false);
 
   const playerRounds = useMemo(
     () => rounds.filter((r) => r.player_id === player.id),
     [rounds, player.id],
   );
-  const matrix = useMemo(() => buildMatrix(playerRounds), [playerRounds]);
-  const total = useMemo(() => totalStars(playerRounds), [playerRounds]);
 
-  // Hvilke hcp-kolonner er "fullført" (gull på alle 7 avstander)?
+  const hcp = player.current_hcp;
+  const prog = useMemo(() => hcpProgress(playerRounds, hcp), [playerRounds, hcp]);
+  const downHcp = nextHcpDown(hcp);
+
+  // Hvilke hcp er ferdig (alle 7 gull) — vises i hcp-velgeren.
   const completedHcps = useMemo(() => {
     const set = new Set<number>();
-    for (const hcp of HCP_RANGE) {
-      const allGold = DISTANCES.every((d) => matrix.get(`${hcp}:${d}`)?.best === "gold");
-      if (allGold) set.add(hcp);
-    }
+    for (const h of HCP_RANGE) if (hcpProgress(playerRounds, h).completed) set.add(h);
     return set;
-  }, [matrix]);
-
-  const maxStars = HCP_RANGE.length * DISTANCES.length * 3;
+  }, [playerRounds]);
 
   return (
     <div className="screen">
@@ -44,77 +46,71 @@ export default function PlayerBoard({ player, rounds, onBack, onStart, onDelete 
           <span className="dot" style={{ background: player.color }} />
           {player.name}
         </span>
-        <button className="icon-btn" onClick={() => setConfirmDelete(true)} aria-label="Innstillinger">
+        <button className="icon-btn" onClick={() => setConfirmDelete(true)} aria-label="Mer">
           ⋯
         </button>
       </header>
 
-      <div className="board-stat">
-        <div className="board-stat-num tabnum">
-          {total}
-          <StarIcon variant="gold" size={28} />
-        </div>
-        <div className="board-stat-prog">
-          <div className="progress">
-            <div className="progress-fill" style={{ width: `${(total / maxStars) * 100}%` }} />
+      {/* Hcp-fokus-kort */}
+      <div className="hcp-card">
+        <div className="hcp-card-top">
+          <div className="hcp-badge">
+            <span className="hcp-badge-label">Handicap</span>
+            <span className="hcp-badge-num">{hcp}</span>
           </div>
-          <span className="muted">{total} av {maxStars} stjerner</span>
+          <div className="hcp-card-prog">
+            <div className="hcp-prog-line">
+              <strong className="tabnum">{prog.goldCount}/7</strong> gull
+              <button className="hcp-switch-btn" onClick={() => setSwitchHcp((v) => !v)}>
+                Bytt {switchHcp ? "▴" : "▾"}
+              </button>
+            </div>
+            <div className="progress">
+              <div className="progress-fill gold" style={{ width: `${(prog.goldCount / 7) * 100}%` }} />
+            </div>
+          </div>
         </div>
-      </div>
 
-      <p className="board-hint">Trykk på en rute for å starte en runde</p>
-
-      <div className="matrix-wrap">
-        <table className="matrix">
-          <thead>
-            <tr>
-              <th className="corner" />
-              {HCP_RANGE.map((hcp) => (
-                <th key={hcp} className={completedHcps.has(hcp) ? "hcp-done" : ""}>
-                  {hcp}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {DISTANCES.map((d) => (
-              <tr key={d}>
-                <th className="dist-label">
-                  <span className="cone" style={{ background: DISTANCE_COLOR[d] }} />
-                  {d}
-                </th>
-                {HCP_RANGE.map((hcp) => {
-                  const cell = matrix.get(`${hcp}:${d}`);
-                  const best: Star = cell?.best ?? "none";
-                  return (
-                    <td key={hcp}>
-                      <button
-                        className={`cell star-${best}`}
-                        onClick={() => onStart(hcp, d)}
-                        aria-label={`Hcp ${hcp}, ${d} meter${
-                          best !== "none" ? `, beste: ${best}` : ""
-                        }`}
-                      >
-                        {best === "none" ? (
-                          <span className="cell-dash">·</span>
-                        ) : (
-                          <StarIcon variant={best} size={20} outline={false} />
-                        )}
-                      </button>
-                    </td>
-                  );
-                })}
-              </tr>
+        {switchHcp && (
+          <div className="hcp-switch-row">
+            {HCP_RANGE.map((h) => (
+              <button
+                key={h}
+                className={`chip ${h === hcp ? "is-active" : ""} ${completedHcps.has(h) ? "is-done" : ""}`}
+                onClick={() => {
+                  onSetHcp(h);
+                  setSwitchHcp(false);
+                }}
+              >
+                {h}
+                {completedHcps.has(h) && <span className="chip-done-dot">★</span>}
+              </button>
             ))}
-          </tbody>
-        </table>
+          </div>
+        )}
       </div>
 
-      <div className="legend">
-        <Legend variant="bronze" label="Bronse" />
-        <Legend variant="silver" label="Sølv" />
-        <Legend variant="gold" label="Gull" />
+      {/* Reise / oversikt */}
+      <div className="mode-toggle">
+        <button className={mode === "journey" ? "is-on" : ""} onClick={() => setMode("journey")}>
+          Reise
+        </button>
+        <button className={mode === "overview" ? "is-on" : ""} onClick={() => setMode("overview")}>
+          Oversikt
+        </button>
       </div>
+
+      {mode === "journey" ? (
+        <Journey
+          hcp={hcp}
+          prog={prog}
+          downHcp={downHcp}
+          onStart={(d) => onStart(hcp, d)}
+          onGoDown={() => downHcp && onSetHcp(downHcp)}
+        />
+      ) : (
+        <OverviewGrid playerRounds={playerRounds} currentHcp={hcp} onStart={onStart} />
+      )}
 
       {confirmDelete && (
         <div className="sheet-backdrop" onClick={() => setConfirmDelete(false)}>
@@ -142,11 +138,146 @@ export default function PlayerBoard({ player, rounds, onBack, onStart, onDelete 
   );
 }
 
-function Legend({ variant, label }: { variant: Star; label: string }) {
+// ─── Reise: de 7 utslagene som en sti ─────────────────────────────────────
+
+function Journey({
+  hcp,
+  prog,
+  downHcp,
+  onStart,
+  onGoDown,
+}: {
+  hcp: number;
+  prog: ReturnType<typeof hcpProgress>;
+  downHcp: number | null;
+  onStart: (distance: number) => void;
+  onGoDown: () => void;
+}) {
   return (
-    <span className="legend-item">
-      <StarIcon variant={variant} size={16} outline={false} />
-      {label}
-    </span>
+    <>
+      {prog.completed && (
+        <div className="complete-banner">
+          <div className="complete-emoji">🎉</div>
+          <div className="complete-text">
+            <strong>Handicap {hcp} fullført!</strong>
+            <span className="muted">Gull på alle utslag.</span>
+          </div>
+          {downHcp ? (
+            <button className="btn btn-primary" onClick={onGoDown}>
+              Gå videre til handicap {downHcp} →
+            </button>
+          ) : (
+            <p className="muted" style={{ textAlign: "center" }}>
+              🏆 Du har fullført det hardeste handicapet!
+            </p>
+          )}
+        </div>
+      )}
+
+      <div className="journey">
+        {DISTANCES.map((d) => {
+          const star: Star = prog.bestStarByDistance[d] ?? "none";
+          const isNext = d === prog.nextDistance;
+          const isFuture = prog.nextDistance !== null && d > prog.nextDistance && star === "none";
+          return (
+            <button
+              key={d}
+              className={`step ${isNext ? "is-next" : ""} ${star === "gold" ? "is-gold" : ""} ${
+                isFuture ? "is-future" : ""
+              }`}
+              onClick={() => onStart(d)}
+            >
+              <span className="step-cone" style={{ background: DISTANCE_COLOR[d] }} />
+              <span className="step-dist">{d} m</span>
+              <span className="step-mid">
+                {isNext && <span className="next-tag">Neste</span>}
+                {isNext && star !== "none" && <StarIcon variant={star} size={18} outline={false} />}
+                {!isNext && <span className="step-star-label muted">{starLabel(star)}</span>}
+              </span>
+              <span className="step-right">
+                {isNext ? (
+                  <span className="step-play">Spill ▶</span>
+                ) : star !== "none" ? (
+                  <StarIcon variant={star} size={26} outline={false} />
+                ) : (
+                  <span className="cell-dash">·</span>
+                )}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </>
   );
+}
+
+// ─── Oversikt: full matrise (sekundær) ─────────────────────────────────────
+
+function OverviewGrid({
+  playerRounds,
+  currentHcp,
+  onStart,
+}: {
+  playerRounds: Round[];
+  currentHcp: number;
+  onStart: (hcp: number, distance: number) => void;
+}) {
+  const matrix = useMemo(() => buildMatrix(playerRounds), [playerRounds]);
+  return (
+    <div className="matrix-wrap">
+      <table className="matrix">
+        <thead>
+          <tr>
+            <th className="corner" />
+            {HCP_RANGE.map((h) => (
+              <th key={h} className={h === currentHcp ? "hcp-current" : ""}>
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {DISTANCES.map((d) => (
+            <tr key={d}>
+              <th className="dist-label">
+                <span className="cone" style={{ background: DISTANCE_COLOR[d] }} />
+                {d}
+              </th>
+              {HCP_RANGE.map((h) => {
+                const best: Star = matrix.get(`${h}:${d}`)?.best ?? "none";
+                return (
+                  <td key={h}>
+                    <button
+                      className={`cell star-${best}`}
+                      onClick={() => onStart(h, d)}
+                      aria-label={`Hcp ${h}, ${d} meter${best !== "none" ? `, beste: ${best}` : ""}`}
+                    >
+                      {best === "none" ? (
+                        <span className="cell-dash">·</span>
+                      ) : (
+                        <StarIcon variant={best} size={18} outline={false} />
+                      )}
+                    </button>
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function starLabel(star: Star): string {
+  switch (star) {
+    case "gold":
+      return "Gull";
+    case "silver":
+      return "Sølv";
+    case "bronze":
+      return "Bronse";
+    default:
+      return "Ikke spilt";
+  }
 }

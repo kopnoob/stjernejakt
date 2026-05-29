@@ -22,17 +22,36 @@ export function useApp() {
     };
   }, []);
 
-  const addPlayer = useCallback(async (name: string, color: string): Promise<Player> => {
-    const p: Player = {
-      id: newId(),
-      name: name.trim(),
-      color,
-      created_at: new Date().toISOString(),
-    };
-    setPlayers((prev) => [...prev, p]);
-    await store.savePlayer(p);
-    return p;
-  }, []);
+  const addPlayer = useCallback(
+    async (name: string, color: string, startHcp = 5): Promise<Player> => {
+      const p: Player = {
+        id: newId(),
+        name: name.trim(),
+        color,
+        current_hcp: startHcp,
+        created_at: new Date().toISOString(),
+      };
+      setPlayers((prev) => [...prev, p]);
+      await store.savePlayer(p);
+      return p;
+    },
+    [],
+  );
+
+  const setCurrentHcp = useCallback(
+    async (playerId: string, hcp: number): Promise<void> => {
+      let updated: Player | undefined;
+      setPlayers((prev) =>
+        prev.map((p) => {
+          if (p.id !== playerId) return p;
+          updated = { ...p, current_hcp: hcp };
+          return updated;
+        }),
+      );
+      if (updated) await store.savePlayer(updated);
+    },
+    [],
+  );
 
   const deletePlayer = useCallback(async (id: string): Promise<void> => {
     setPlayers((prev) => prev.filter((p) => p.id !== id));
@@ -61,5 +80,14 @@ export function useApp() {
     [],
   );
 
-  return { players, rounds, loading, addPlayer, deletePlayer, addRound, backend: store.backend };
+  return {
+    players,
+    rounds,
+    loading,
+    addPlayer,
+    deletePlayer,
+    addRound,
+    setCurrentHcp,
+    backend: store.backend,
+  };
 }

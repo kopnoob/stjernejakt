@@ -48,6 +48,7 @@ export default function App() {
         rounds={app.rounds}
         onBack={() => setView({ name: "players" })}
         onStart={(hcp, distance) => setView({ name: "round", playerId: player.id, hcp, distance })}
+        onSetHcp={(hcp) => app.setCurrentHcp(player.id, hcp)}
         onDelete={async () => {
           await app.deletePlayer(player.id);
           setView({ name: "players" });
