@@ -85,9 +85,9 @@ export default function Round({ player, initialHcp, initialDistance, onSave, onB
 
       {/* Oppsett: hcp + utslag (kan endres uten å miste registrerte slag) */}
       <section className="setup">
-        <div className="setup-row">
+        <div className="setup-group">
           <span className="setup-label">Handicap</span>
-          <div className="chip-scroll">
+          <div className="chip-row">
             {HCP_RANGE.map((v) => (
               <button
                 key={v}
@@ -99,9 +99,9 @@ export default function Round({ player, initialHcp, initialDistance, onSave, onB
             ))}
           </div>
         </div>
-        <div className="setup-row">
-          <span className="setup-label">Utslag</span>
-          <div className="chip-scroll">
+        <div className="setup-group">
+          <span className="setup-label">Utslag (m)</span>
+          <div className="chip-row">
             {DISTANCES.map((v) => (
               <button
                 key={v}
@@ -109,7 +109,7 @@ export default function Round({ player, initialHcp, initialDistance, onSave, onB
                 onClick={() => setDistance(v)}
               >
                 <span className="cone-sm" style={{ background: DISTANCE_COLOR[v] }} />
-                {v}m
+                {v}
               </button>
             ))}
           </div>

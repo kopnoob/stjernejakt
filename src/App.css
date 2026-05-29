@@ -536,48 +536,51 @@
 .setup {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-.setup-row {
-  display: flex;
-  align-items: center;
   gap: 10px;
 }
+.setup-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 .setup-label {
-  width: 64px;
-  flex-shrink: 0;
-  font-size: 12px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--ink-3);
   font-weight: 600;
+  padding-left: 2px;
 }
-.chip-scroll {
+/* 7 like brede chips som alltid fyller bredden — ingen scroll. */
+.chip-row {
   display: flex;
-  gap: 7px;
-  overflow-x: auto;
-  padding: 2px;
-  scrollbar-width: none;
-  flex: 1;
+  gap: 5px;
 }
-.chip-scroll::-webkit-scrollbar { display: none; }
+.chip-row .chip {
+  flex: 1;
+  min-width: 0;
+  padding: 0 2px;
+  white-space: nowrap;
+  gap: 3px;
+}
+.chip-row .chip-dist { font-size: 15px; }
+.chip-row .cone-sm { width: 9px; height: 9px; border-width: 1px; }
 .chip {
-  flex-shrink: 0;
   min-width: 40px;
-  height: 40px;
-  padding: 0 12px;
-  border-radius: var(--r-pill);
+  height: 44px;
+  padding: 0 10px;
+  border-radius: var(--r-sm);
   background: var(--card);
   box-shadow: var(--shadow-sm);
   font-family: var(--display);
   font-weight: 600;
-  font-size: 15px;
+  font-size: 16px;
   color: var(--ink-2);
   border: 2px solid transparent;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 4px;
 }
 .chip.is-active {
   background: var(--green);
