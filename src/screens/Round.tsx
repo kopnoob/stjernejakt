@@ -3,7 +3,7 @@ import StarIcon from "../components/StarIcon";
 import ResultOverlay from "../components/ResultOverlay";
 import { evaluateRound } from "../rules";
 import type { HoleResult, Player } from "../types";
-import { DISTANCES, DISTANCE_COLOR, HCP_RANGE, HOLES_PER_ROUND } from "../types";
+import { DISTANCES, DISTANCE_COLOR, HOLES_PER_ROUND } from "../types";
 
 interface Props {
   player: Player;
@@ -21,10 +21,12 @@ const freshHoles = (): HoleResult[] => [
 ];
 
 export default function Round({ player, initialHcp, initialDistance, onSave, onBack }: Props) {
-  const [hcp, setHcp] = useState(initialHcp);
+  // Hcp er fast for runden (valgt på boardet før start) — flyten er ledende,
+  // så vi redigerer ikke hcp midt i runden.
+  const hcp = initialHcp;
   const [distance, setDistance] = useState(initialDistance);
-  // Slagene beholdes når man bytter hcp/utslag — man retter ofte opp en
-  // feil eller ombestemmer seg midt i runden.
+  // Slagene beholdes hvis man bytter utslag — man retter ofte opp en feil
+  // eller ombestemmer seg midt i runden.
   const [holes, setHoles] = useState<HoleResult[]>(freshHoles);
   const [saved, setSaved] = useState(false);
 
@@ -74,31 +76,20 @@ export default function Round({ player, initialHcp, initialDistance, onSave, onB
         <button className="icon-btn" onClick={onBack} aria-label="Tilbake">
           ‹
         </button>
-        <span className="topbar-title">
-          <span className="dot" style={{ background: player.color }} />
-          {player.name}
+        <span className="topbar-title topbar-title-stack">
+          <span className="topbar-name">
+            <span className="dot" style={{ background: player.color }} />
+            {player.name}
+          </span>
+          <span className="topbar-hcp">Handicap {hcp}</span>
         </span>
         <span className="round-prog tabnum" aria-label="Hull spilt">
           {setHolesList.length}/{HOLES_PER_ROUND}
         </span>
       </header>
 
-      {/* Oppsett: hcp + utslag (kan endres uten å miste registrerte slag) */}
+      {/* Oppsett: kun utslag (hcp er fast). Slag beholdes ved bytte av utslag. */}
       <section className="setup">
-        <div className="setup-group">
-          <span className="setup-label">Handicap</span>
-          <div className="chip-row">
-            {HCP_RANGE.map((v) => (
-              <button
-                key={v}
-                className={`chip ${hcp === v ? "is-active" : ""}`}
-                onClick={() => setHcp(v)}
-              >
-                {v}
-              </button>
-            ))}
-          </div>
-        </div>
         <div className="setup-group">
           <span className="setup-label">Utslag (m)</span>
           <div className="chip-row">

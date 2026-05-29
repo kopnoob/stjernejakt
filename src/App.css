@@ -45,6 +45,24 @@
   font-weight: 600;
   font-size: 19px;
 }
+.topbar-title-stack {
+  flex-direction: column;
+  gap: 1px;
+}
+.topbar-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.topbar-hcp {
+  font-family: var(--body);
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--green-600);
+  background: var(--green-tint);
+  padding: 1px 10px;
+  border-radius: var(--r-pill);
+}
 .dot {
   width: 14px;
   height: 14px;
