@@ -1,20 +1,20 @@
 // Stjerneberegning — speiler den originale Stjernejakt-PDF-en.
 //
 // Et hull regnes "i mål" (holed) bare hvis ballen nådde ringen innen hcp
-// slag. Over-par-hull (i mål med flere slag) teller IKKE som hull i mål,
-// men slagene teller mot tilleggsregelen.
+// slag. Over-par-hull (i mål med flere slag) teller IKKE som hull i mål.
 //
 // Stjerne:
 //   3 hull i mål → gull
 //   2 hull i mål → sølv
 //   1 hull i mål → bronse
-//   I tillegg: gull hvis totalt antall slag ≤ 3 × hcp (og > 0).
+//   I tillegg: gull hvis totalt antall slag ≤ 3 × hcp (og > 0) —
+//   MEN bare hvis ingen hull er plukket opp (man må ha fullført alle).
 
 import type { HoleResult, HoleStatus, Round, Star } from "./types";
 import { STAR_RANK } from "./types";
 
 export function holeStatus(hole: HoleResult, hcp: number): HoleStatus {
-  if (!hole.reached) return "failed";
+  if (hole.pickedUp) return "failed";
   return hole.strokes <= hcp ? "holed" : "over_par";
 }
 
@@ -23,24 +23,29 @@ export interface RoundResult {
   holedCount: number;
   totalStrokes: number;
   promoted: boolean;
+  /** True hvis minst ett hull ble plukket opp (blokkerer 3×hcp-gull). */
+  anyPickedUp: boolean;
 }
 
 export function evaluateRound(holes: HoleResult[], hcp: number, distance: number): RoundResult {
   const holedCount = holes.filter((h) => holeStatus(h, hcp) === "holed").length;
   const totalStrokes = holes.reduce((sum, h) => sum + (h.strokes || 0), 0);
+  const anyPickedUp = holes.some((h) => h.pickedUp);
 
   let star: Star = "none";
   if (holedCount >= 3) star = "gold";
   else if (holedCount === 2) star = "silver";
   else if (holedCount === 1) star = "bronze";
 
+  // Tilleggsregel: gull hvis total ≤ 3×hcp — men kun når alle hull er
+  // fullført (ingen plukket opp).
   const threshold = 3 * hcp;
-  if (totalStrokes > 0 && totalStrokes <= threshold) {
+  if (!anyPickedUp && totalStrokes > 0 && totalStrokes <= threshold) {
     star = maxStar(star, "gold");
   }
 
   const promoted = star === "gold" && distance === 100;
-  return { star, holedCount, totalStrokes, promoted };
+  return { star, holedCount, totalStrokes, promoted, anyPickedUp };
 }
 
 export function maxStar(a: Star, b: Star): Star {

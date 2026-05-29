@@ -15,52 +15,43 @@ interface Props {
 
 const MAX_STROKES = 20;
 const freshHoles = (): HoleResult[] => [
-  { strokes: 0, reached: true },
-  { strokes: 0, reached: true },
-  { strokes: 0, reached: true },
+  { strokes: 0, pickedUp: false },
+  { strokes: 0, pickedUp: false },
+  { strokes: 0, pickedUp: false },
 ];
 
 export default function Round({ player, initialHcp, initialDistance, onSave, onBack }: Props) {
   const [hcp, setHcp] = useState(initialHcp);
   const [distance, setDistance] = useState(initialDistance);
+  // Slagene beholdes når man bytter hcp/utslag — man retter ofte opp en
+  // feil eller ombestemmer seg midt i runden.
   const [holes, setHoles] = useState<HoleResult[]>(freshHoles);
   const [saved, setSaved] = useState(false);
-
-  // Endrer man oppsett, nullstilles slagene (det er en ny runde-konfig).
-  function changeHcp(v: number) {
-    setHcp(v);
-    setHoles(freshHoles());
-  }
-  function changeDistance(v: number) {
-    setDistance(v);
-    setHoles(freshHoles());
-  }
 
   function bumpStrokes(i: number, delta: number) {
     setHoles((prev) => {
       const next = prev.slice();
+      // +/− henter tilbake tall-feltet hvis hullet var plukket opp.
       const strokes = Math.max(0, Math.min(MAX_STROKES, next[i].strokes + delta));
-      next[i] = { ...next[i], strokes };
+      next[i] = { strokes, pickedUp: false };
       return next;
     });
   }
-  function toggleReached(i: number) {
+  function togglePickedUp(i: number) {
     setHoles((prev) => {
       const next = prev.slice();
-      next[i] = { ...next[i], reached: !next[i].reached };
+      next[i] = { ...next[i], pickedUp: !next[i].pickedUp };
       return next;
     });
   }
 
-  const setHolesList = holes.filter((h) => h.strokes > 0);
-  const allSet = holes.every((h) => h.strokes > 0);
+  const setHolesList = holes.filter((h) => h.pickedUp || h.strokes > 0);
+  const allSet = holes.every((h) => h.pickedUp || h.strokes > 0);
 
-  const totalStrokes = useMemo(
-    () => holes.reduce((s, h) => s + h.strokes, 0),
-    [holes],
-  );
+  const totalStrokes = useMemo(() => holes.reduce((s, h) => s + h.strokes, 0), [holes]);
+  const anyPickedUp = holes.some((h) => h.pickedUp);
   const holedSoFar = useMemo(
-    () => setHolesList.filter((h) => h.reached && h.strokes <= hcp).length,
+    () => setHolesList.filter((h) => !h.pickedUp && h.strokes <= hcp).length,
     [setHolesList, hcp],
   );
 
@@ -92,7 +83,7 @@ export default function Round({ player, initialHcp, initialDistance, onSave, onB
         </span>
       </header>
 
-      {/* Oppsett: hcp + utslag */}
+      {/* Oppsett: hcp + utslag (kan endres uten å miste registrerte slag) */}
       <section className="setup">
         <div className="setup-row">
           <span className="setup-label">Handicap</span>
@@ -101,7 +92,7 @@ export default function Round({ player, initialHcp, initialDistance, onSave, onB
               <button
                 key={v}
                 className={`chip ${hcp === v ? "is-active" : ""}`}
-                onClick={() => changeHcp(v)}
+                onClick={() => setHcp(v)}
               >
                 {v}
               </button>
@@ -115,7 +106,7 @@ export default function Round({ player, initialHcp, initialDistance, onSave, onB
               <button
                 key={v}
                 className={`chip chip-dist ${distance === v ? "is-active" : ""}`}
-                onClick={() => changeDistance(v)}
+                onClick={() => setDistance(v)}
                 style={
                   distance === v
                     ? { borderColor: DISTANCE_COLOR[v], background: DISTANCE_COLOR[v], color: "#10231a" }
@@ -139,7 +130,7 @@ export default function Round({ player, initialHcp, initialDistance, onSave, onB
             hcp={hcp}
             hole={holes[i]}
             onBump={(d) => bumpStrokes(i, d)}
-            onToggleReached={() => toggleReached(i)}
+            onTogglePickedUp={() => togglePickedUp(i)}
           />
         ))}
       </section>
@@ -148,17 +139,19 @@ export default function Round({ player, initialHcp, initialDistance, onSave, onB
       <div className={`save-bar ${allSet ? "is-ready" : ""}`}>
         {finalResult ? (
           <div className="save-result">
-            <StarIcon variant={finalResult.star} size={34} />
+            <StarIcon variant={finalResult.star} size={38} />
             <div className="save-result-text">
               <strong>{starLabel(finalResult.star)}</strong>
               <span className="muted">
-                {finalResult.holedCount}/3 i mål · {finalResult.totalStrokes}/{threshold} slag
+                {finalResult.holedCount}/3 i mål
+                {anyPickedUp ? " · plukket opp" : ` · ${finalResult.totalStrokes}/${threshold} slag`}
               </span>
             </div>
           </div>
         ) : (
           <span className="muted save-hint">
-            Registrer alle 3 hull · {holedSoFar} i mål · {totalStrokes}/{threshold} slag
+            Registrer alle 3 hull · {holedSoFar} i mål
+            {anyPickedUp ? " · plukket opp" : ` · ${totalStrokes}/${threshold} slag`}
           </span>
         )}
         <button className="btn btn-primary btn-save" disabled={!allSet} onClick={handleSave}>
@@ -178,25 +171,25 @@ function HoleCard({
   hcp,
   hole,
   onBump,
-  onToggleReached,
+  onTogglePickedUp,
 }: {
   index: number;
   hcp: number;
   hole: HoleResult;
   onBump: (delta: number) => void;
-  onToggleReached: () => void;
+  onTogglePickedUp: () => void;
 }) {
-  const isSet = hole.strokes > 0;
+  const isSet = hole.pickedUp || hole.strokes > 0;
   const status = !isSet
     ? null
-    : !hole.reached
-    ? { txt: `Ikke i mål · ${hole.strokes} slag`, cls: "st-fail" }
+    : hole.pickedUp
+    ? { txt: "Plukket opp", cls: "st-fail" }
     : hole.strokes <= hcp
     ? { txt: `I mål · ${hole.strokes} slag`, cls: "st-holed" }
     : { txt: `Over par · ${hole.strokes} slag`, cls: "st-over" };
 
   return (
-    <div className={`hole-card ${isSet ? "is-set" : ""}`}>
+    <div className={`hole-card ${isSet ? "is-set" : ""} ${hole.pickedUp ? "is-pickup" : ""}`}>
       <div className="hole-head">
         <span className="hole-name">Hull {index + 1}</span>
         {status && <span className={`hole-status ${status.cls}`}>{status.txt}</span>}
@@ -207,14 +200,14 @@ function HoleCard({
           <button
             className="step-btn"
             onClick={() => onBump(-1)}
-            disabled={hole.strokes === 0}
+            disabled={!hole.pickedUp && hole.strokes === 0}
             aria-label={`Færre slag på hull ${index + 1}`}
           >
             −
           </button>
           <span className="step-value tabnum">
-            <strong>{hole.strokes || "–"}</strong>
-            <span className="step-unit">slag</span>
+            <strong>{hole.pickedUp ? "✕" : hole.strokes || "–"}</strong>
+            <span className="step-unit">{hole.pickedUp ? "plukket opp" : "slag"}</span>
           </span>
           <button
             className="step-btn"
@@ -226,11 +219,11 @@ function HoleCard({
         </div>
 
         <button
-          className={`reach-toggle ${hole.reached ? "is-in" : "is-bom"}`}
-          onClick={onToggleReached}
-          aria-pressed={!hole.reached}
+          className={`pickup-toggle ${hole.pickedUp ? "is-on" : ""}`}
+          onClick={onTogglePickedUp}
+          aria-pressed={hole.pickedUp}
         >
-          {hole.reached ? "✓ I mål" : "✗ Bom"}
+          Plukk opp
         </button>
       </div>
     </div>

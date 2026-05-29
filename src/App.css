@@ -423,14 +423,14 @@
 .holes {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   flex: 1;
 }
 .hole-card {
   background: var(--card);
   border-radius: var(--r);
   box-shadow: var(--shadow);
-  padding: 12px 14px;
+  padding: 14px 16px;
   border: 2px solid transparent;
   transition: border-color 0.15s ease;
 }
@@ -444,7 +444,7 @@
 .hole-name {
   font-family: var(--display);
   font-weight: 600;
-  font-size: 16px;
+  font-size: 17px;
 }
 .hole-status {
   font-size: 12.5px;
@@ -468,17 +468,17 @@
   justify-content: space-between;
   background: var(--card-sunken);
   border-radius: var(--r-pill);
-  padding: 5px;
+  padding: 7px;
 }
 .step-btn {
-  width: 48px;
-  height: 48px;
+  width: 62px;
+  height: 62px;
   border-radius: 50%;
   background: var(--card);
   box-shadow: var(--shadow-sm);
   font-family: var(--display);
   font-weight: 600;
-  font-size: 28px;
+  font-size: 36px;
   line-height: 1;
   color: var(--green);
   display: grid;
@@ -486,18 +486,18 @@
   transition: transform 0.1s ease;
 }
 .step-btn:active { transform: scale(0.9); }
-.step-btn:disabled { opacity: 0.35; }
+.step-btn:disabled { opacity: 0.3; }
 .step-value {
   display: flex;
   flex-direction: column;
   align-items: center;
   line-height: 1;
-  min-width: 56px;
+  min-width: 64px;
 }
 .step-value strong {
   font-family: var(--display);
   font-weight: 700;
-  font-size: 30px;
+  font-size: 40px;
   color: var(--ink);
 }
 .step-unit {
@@ -505,29 +505,31 @@
   color: var(--ink-3);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  margin-top: 2px;
+  margin-top: 4px;
 }
-.reach-toggle {
+.pickup-toggle {
   flex-shrink: 0;
-  height: 48px;
-  padding: 0 16px;
-  border-radius: var(--r-pill);
+  height: 62px;
+  width: 84px;
+  padding: 0 10px;
+  border-radius: var(--r);
+  background: var(--card-sunken);
+  color: var(--ink-2);
   font-family: var(--display);
   font-weight: 600;
-  font-size: 15px;
+  font-size: 14px;
+  line-height: 1.15;
   transition: transform 0.1s ease;
-  border: 2px solid transparent;
+  border: 2px solid var(--line);
 }
-.reach-toggle:active { transform: scale(0.95); }
-.reach-toggle.is-in {
-  background: var(--green-tint);
-  color: var(--green-600);
-  border-color: var(--green-300);
+.pickup-toggle:active { transform: scale(0.94); }
+.pickup-toggle.is-on {
+  background: var(--terracotta);
+  color: #fff;
+  border-color: var(--terracotta);
+  box-shadow: 0 4px 12px rgba(217, 116, 79, 0.35);
 }
-.reach-toggle.is-bom {
-  background: var(--silver-tint);
-  color: var(--ink-2);
-}
+.hole-card.is-pickup { border-color: var(--terracotta); }
 
 /* ─── Runde: bunnlinje ──────────────────────────────────── */
 .save-bar {

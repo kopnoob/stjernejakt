@@ -8,10 +8,14 @@ export type Star = "none" | "bronze" | "silver" | "gold";
 export type HoleStatus = "holed" | "over_par" | "failed";
 
 export interface HoleResult {
-  /** Antall slag brukt på hullet. */
+  /** Antall slag brukt på hullet (beholdes selv om man plukker opp). */
   strokes: number;
-  /** Kom ballen i mål (innenfor ringen)? */
-  reached: boolean;
+  /**
+   * Plukket opp (ga seg uten å fullføre hullet). Vises som «✕».
+   * Et plukket-opp hull teller ikke som i mål, OG hindrer gull via
+   * 3×hcp-regelen (man fullførte ikke alle hull).
+   */
+  pickedUp: boolean;
 }
 
 export interface Player {
