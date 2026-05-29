@@ -456,32 +456,78 @@
 .st-over { background: var(--gold-tint); color: #9a6b00; }
 .st-fail { background: var(--silver-tint); color: var(--ink-2); }
 
-.pick-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
-  gap: 7px;
+.hole-input {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
-.pick {
-  height: 46px;
-  border-radius: var(--r-sm);
+.stepper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   background: var(--card-sunken);
+  border-radius: var(--r-pill);
+  padding: 5px;
+}
+.step-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
   font-family: var(--display);
   font-weight: 600;
-  font-size: 17px;
+  font-size: 28px;
+  line-height: 1;
+  color: var(--green);
+  display: grid;
+  place-items: center;
+  transition: transform 0.1s ease;
+}
+.step-btn:active { transform: scale(0.9); }
+.step-btn:disabled { opacity: 0.35; }
+.step-value {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+  min-width: 56px;
+}
+.step-value strong {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 30px;
   color: var(--ink);
+}
+.step-unit {
+  font-size: 11px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 2px;
+}
+.reach-toggle {
+  flex-shrink: 0;
+  height: 48px;
+  padding: 0 16px;
+  border-radius: var(--r-pill);
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 15px;
   transition: transform 0.1s ease;
   border: 2px solid transparent;
 }
-.pick:active { transform: scale(0.92); }
-.pick.is-on {
-  background: var(--green);
-  color: #fff;
-  box-shadow: 0 4px 10px rgba(31, 107, 67, 0.3);
+.reach-toggle:active { transform: scale(0.95); }
+.reach-toggle.is-in {
+  background: var(--green-tint);
+  color: var(--green-600);
+  border-color: var(--green-300);
 }
-.pick-over { font-size: 14px; color: var(--ink-2); }
-.pick-over.is-on { background: var(--gold); color: #3a2c00; box-shadow: 0 4px 10px rgba(239,176,20,0.4); }
-.pick-bom { font-size: 14px; color: var(--ink-2); }
-.pick-bom.is-on { background: var(--silver); color: #2a3038; box-shadow: none; }
+.reach-toggle.is-bom {
+  background: var(--silver-tint);
+  color: var(--ink-2);
+}
 
 /* ─── Runde: bunnlinje ──────────────────────────────────── */
 .save-bar {

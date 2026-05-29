@@ -5,8 +5,6 @@ import { evaluateRound } from "../rules";
 import type { HoleResult, Player } from "../types";
 import { DISTANCES, DISTANCE_COLOR, HCP_RANGE, HOLES_PER_ROUND } from "../types";
 
-type Pick = number | "over" | "bom" | null;
-
 interface Props {
   player: Player;
   initialHcp: number;
@@ -15,56 +13,66 @@ interface Props {
   onBack: () => void;
 }
 
-function pickToHole(pick: Exclude<Pick, null>, hcp: number): HoleResult {
-  if (pick === "over") return { strokes: hcp + 2, reached: true };
-  if (pick === "bom") return { strokes: hcp + 3, reached: false };
-  return { strokes: pick, reached: true };
-}
+const MAX_STROKES = 20;
+const freshHoles = (): HoleResult[] => [
+  { strokes: 0, reached: true },
+  { strokes: 0, reached: true },
+  { strokes: 0, reached: true },
+];
 
 export default function Round({ player, initialHcp, initialDistance, onSave, onBack }: Props) {
   const [hcp, setHcp] = useState(initialHcp);
   const [distance, setDistance] = useState(initialDistance);
-  const [picks, setPicks] = useState<Pick[]>([null, null, null]);
+  const [holes, setHoles] = useState<HoleResult[]>(freshHoles);
   const [saved, setSaved] = useState(false);
 
   // Endrer man oppsett, nullstilles slagene (det er en ny runde-konfig).
   function changeHcp(v: number) {
     setHcp(v);
-    setPicks([null, null, null]);
+    setHoles(freshHoles());
   }
   function changeDistance(v: number) {
     setDistance(v);
-    setPicks([null, null, null]);
+    setHoles(freshHoles());
   }
 
-  function setPick(holeIdx: number, value: Pick) {
-    setPicks((prev) => {
+  function bumpStrokes(i: number, delta: number) {
+    setHoles((prev) => {
       const next = prev.slice();
-      next[holeIdx] = next[holeIdx] === value ? null : value; // toggle av ved nytt trykk
+      const strokes = Math.max(0, Math.min(MAX_STROKES, next[i].strokes + delta));
+      next[i] = { ...next[i], strokes };
+      return next;
+    });
+  }
+  function toggleReached(i: number) {
+    setHoles((prev) => {
+      const next = prev.slice();
+      next[i] = { ...next[i], reached: !next[i].reached };
       return next;
     });
   }
 
-  const allSet = picks.every((p) => p !== null);
-  const mappedHoles: HoleResult[] = useMemo(
-    () => picks.filter((p) => p !== null).map((p) => pickToHole(p as Exclude<Pick, null>, hcp)),
-    [picks, hcp],
-  );
+  const setHolesList = holes.filter((h) => h.strokes > 0);
+  const allSet = holes.every((h) => h.strokes > 0);
 
-  // Foreløpig resultat (kun for visning). Endelig stjerne krever alle 3.
-  const projection = useMemo(() => {
-    const holedSoFar = mappedHoles.filter((h) => h.reached && h.strokes <= hcp).length;
-    return { holedSoFar, setCount: mappedHoles.length };
-  }, [mappedHoles, hcp]);
+  const totalStrokes = useMemo(
+    () => holes.reduce((s, h) => s + h.strokes, 0),
+    [holes],
+  );
+  const holedSoFar = useMemo(
+    () => setHolesList.filter((h) => h.reached && h.strokes <= hcp).length,
+    [setHolesList, hcp],
+  );
 
   const finalResult = useMemo(() => {
     if (!allSet) return null;
-    return evaluateRound(mappedHoles, hcp, distance);
-  }, [allSet, mappedHoles, hcp, distance]);
+    return evaluateRound(holes, hcp, distance);
+  }, [allSet, holes, hcp, distance]);
+
+  const threshold = 3 * hcp;
 
   async function handleSave() {
     if (!allSet) return;
-    const holes = picks.map((p) => pickToHole(p as Exclude<Pick, null>, hcp));
     setSaved(true);
     await onSave(hcp, distance, holes);
   }
@@ -80,7 +88,7 @@ export default function Round({ player, initialHcp, initialDistance, onSave, onB
           {player.name}
         </span>
         <span className="round-prog tabnum" aria-label="Hull spilt">
-          {projection.setCount}/{HOLES_PER_ROUND}
+          {setHolesList.length}/{HOLES_PER_ROUND}
         </span>
       </header>
 
@@ -125,7 +133,14 @@ export default function Round({ player, initialHcp, initialDistance, onSave, onB
       {/* Tre hull samtidig */}
       <section className="holes">
         {[0, 1, 2].map((i) => (
-          <HoleCard key={i} index={i} hcp={hcp} pick={picks[i]} onPick={(v) => setPick(i, v)} />
+          <HoleCard
+            key={i}
+            index={i}
+            hcp={hcp}
+            hole={holes[i]}
+            onBump={(d) => bumpStrokes(i, d)}
+            onToggleReached={() => toggleReached(i)}
+          />
         ))}
       </section>
 
@@ -137,13 +152,13 @@ export default function Round({ player, initialHcp, initialDistance, onSave, onB
             <div className="save-result-text">
               <strong>{starLabel(finalResult.star)}</strong>
               <span className="muted">
-                {finalResult.holedCount}/3 i mål · {finalResult.totalStrokes} slag
+                {finalResult.holedCount}/3 i mål · {finalResult.totalStrokes}/{threshold} slag
               </span>
             </div>
           </div>
         ) : (
           <span className="muted save-hint">
-            Registrer alle 3 hull ({projection.holedSoFar} i mål så langt)
+            Registrer alle 3 hull · {holedSoFar} i mål · {totalStrokes}/{threshold} slag
           </span>
         )}
         <button className="btn btn-primary btn-save" disabled={!allSet} onClick={handleSave}>
@@ -152,12 +167,7 @@ export default function Round({ player, initialHcp, initialDistance, onSave, onB
       </div>
 
       {saved && finalResult && (
-        <ResultOverlay
-          result={finalResult}
-          hcp={hcp}
-          distance={distance}
-          onDone={onBack}
-        />
+        <ResultOverlay result={finalResult} hcp={hcp} distance={distance} onDone={onBack} />
       )}
     </div>
   );
@@ -166,51 +176,61 @@ export default function Round({ player, initialHcp, initialDistance, onSave, onB
 function HoleCard({
   index,
   hcp,
-  pick,
-  onPick,
+  hole,
+  onBump,
+  onToggleReached,
 }: {
   index: number;
   hcp: number;
-  pick: Pick;
-  onPick: (v: Pick) => void;
+  hole: HoleResult;
+  onBump: (delta: number) => void;
+  onToggleReached: () => void;
 }) {
-  const numbers = Array.from({ length: hcp }, (_, i) => i + 1);
-  const status =
-    pick === null
-      ? null
-      : pick === "bom"
-      ? { txt: "Ikke i mål", cls: "st-fail" }
-      : pick === "over"
-      ? { txt: "Over par", cls: "st-over" }
-      : { txt: `I mål på ${pick} slag`, cls: "st-holed" };
+  const isSet = hole.strokes > 0;
+  const status = !isSet
+    ? null
+    : !hole.reached
+    ? { txt: `Ikke i mål · ${hole.strokes} slag`, cls: "st-fail" }
+    : hole.strokes <= hcp
+    ? { txt: `I mål · ${hole.strokes} slag`, cls: "st-holed" }
+    : { txt: `Over par · ${hole.strokes} slag`, cls: "st-over" };
 
   return (
-    <div className={`hole-card ${pick !== null ? "is-set" : ""}`}>
+    <div className={`hole-card ${isSet ? "is-set" : ""}`}>
       <div className="hole-head">
         <span className="hole-name">Hull {index + 1}</span>
         {status && <span className={`hole-status ${status.cls}`}>{status.txt}</span>}
       </div>
-      <div className="pick-grid">
-        {numbers.map((n) => (
+
+      <div className="hole-input">
+        <div className="stepper">
           <button
-            key={n}
-            className={`pick ${pick === n ? "is-on" : ""}`}
-            onClick={() => onPick(n)}
+            className="step-btn"
+            onClick={() => onBump(-1)}
+            disabled={hole.strokes === 0}
+            aria-label={`Færre slag på hull ${index + 1}`}
           >
-            {n}
+            −
           </button>
-        ))}
+          <span className="step-value tabnum">
+            <strong>{hole.strokes || "–"}</strong>
+            <span className="step-unit">slag</span>
+          </span>
+          <button
+            className="step-btn"
+            onClick={() => onBump(1)}
+            aria-label={`Flere slag på hull ${index + 1}`}
+          >
+            +
+          </button>
+        </div>
+
         <button
-          className={`pick pick-over ${pick === "over" ? "is-on" : ""}`}
-          onClick={() => onPick("over")}
+          className={`reach-toggle ${hole.reached ? "is-in" : "is-bom"}`}
+          onClick={onToggleReached}
+          aria-pressed={!hole.reached}
         >
-          Over
-        </button>
-        <button
-          className={`pick pick-bom ${pick === "bom" ? "is-on" : ""}`}
-          onClick={() => onPick("bom")}
-        >
-          Bom
+          {hole.reached ? "✓ I mål" : "✗ Bom"}
         </button>
       </div>
     </div>
