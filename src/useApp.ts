@@ -107,6 +107,36 @@ export function useApp() {
     [],
   );
 
+  // Lagre flere runder samtidig (flight) — én optimistisk oppdatering, og
+  // synkstatus reflekterer om ALT kom opp i skyen.
+  const addRounds = useCallback(
+    async (entries: { playerId: string; hcp: number; distance: number; holes: HoleResult[] }[]): Promise<Round[]> => {
+      const newRounds: Round[] = entries.map((e) => {
+        const res = evaluateRound(e.holes, e.hcp, e.distance);
+        return {
+          id: newId(),
+          player_id: e.playerId,
+          hcp: e.hcp,
+          distance: e.distance,
+          star: res.star as Star,
+          holed_count: res.holedCount,
+          total_strokes: res.totalStrokes,
+          holes: e.holes,
+          created_at: new Date().toISOString(),
+        };
+      });
+      setRounds((prev) => [...prev, ...newRounds]);
+      let allSynced = true;
+      for (const r of newRounds) {
+        const { synced } = await store.saveRound(r);
+        if (!synced) allSynced = false;
+      }
+      applySync(allSynced);
+      return newRounds;
+    },
+    [],
+  );
+
   return {
     players,
     rounds,
@@ -115,6 +145,7 @@ export function useApp() {
     addPlayer,
     deletePlayer,
     addRound,
+    addRounds,
     getHcp,
     setCurrentHcp,
     backend: store.backend,

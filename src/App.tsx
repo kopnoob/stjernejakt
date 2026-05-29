@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import Players from "./screens/Players";
 import PlayerBoard from "./screens/PlayerBoard";
 import Round from "./screens/Round";
+import FlightSetup from "./screens/FlightSetup";
+import FlightRound from "./screens/FlightRound";
 import { useApp } from "./useApp";
 import { hcpProgress } from "./rules";
 import { DEFAULT_HCP } from "./types";
@@ -9,7 +11,9 @@ import { DEFAULT_HCP } from "./types";
 type View =
   | { name: "players" }
   | { name: "board"; playerId: string }
-  | { name: "round"; playerId: string; hcp: number; distance: number };
+  | { name: "round"; playerId: string; hcp: number; distance: number }
+  | { name: "flight" }
+  | { name: "flightRound"; distance: number; playerIds: string[] };
 
 // ─── Hash-routing (F6) ──────────────────────────────────────────────────────
 // Hash-basert ruting gjør nettleserens tilbake-knapp ekte (hvert skjerm-bytte
@@ -17,10 +21,18 @@ type View =
 //   #/                         → spillerliste
 //   #/p/<id>                   → spiller-board
 //   #/p/<id>/r/<hcp>/<dist>    → aktiv runde
+//   #/flight                   → velg flight (spillere + avstand)
+//   #/flight/r/<dist>/<ids>    → flight-runde (ids = komma-separert)
 
 function parseHash(): View {
   const raw = location.hash.replace(/^#\/?/, "");
   const parts = raw.split("/").filter(Boolean);
+  if (parts[0] === "flight") {
+    if (parts[1] === "r" && parts[2] && parts[3]) {
+      return { name: "flightRound", distance: Number(parts[2]), playerIds: parts[3].split(",").filter(Boolean) };
+    }
+    return { name: "flight" };
+  }
   if (parts[0] === "p" && parts[1]) {
     if (parts[2] === "r" && parts[3] && parts[4]) {
       return { name: "round", playerId: parts[1], hcp: Number(parts[3]), distance: Number(parts[4]) };
@@ -33,6 +45,8 @@ function parseHash(): View {
 function toHash(v: View): string {
   if (v.name === "board") return `#/p/${v.playerId}`;
   if (v.name === "round") return `#/p/${v.playerId}/r/${v.hcp}/${v.distance}`;
+  if (v.name === "flight") return "#/flight";
+  if (v.name === "flightRound") return `#/flight/r/${v.distance}/${v.playerIds.join(",")}`;
   return "#/";
 }
 
@@ -84,6 +98,44 @@ export default function App() {
         getHcp={app.getHcp}
         onOpen={(playerId) => navigate({ name: "board", playerId })}
         onAdd={app.addPlayer}
+        onFlight={() => navigate({ name: "flight" })}
+      />
+    );
+  }
+
+  if (view.name === "flight") {
+    return (
+      <FlightSetup
+        players={app.players}
+        getHcp={app.getHcp}
+        onBack={() => navigate({ name: "players" })}
+        onStart={(distance, playerIds) => navigate({ name: "flightRound", distance, playerIds })}
+      />
+    );
+  }
+
+  if (view.name === "flightRound") {
+    const flightPlayers = view.playerIds
+      .map((id) => app.players.find((p) => p.id === id))
+      .filter((p): p is NonNullable<typeof p> => Boolean(p));
+    if (flightPlayers.length < 2) {
+      // Ugyldig lenke / spillere slettet — tilbake til oppsett.
+      return (
+        <FlightSetup
+          players={app.players}
+          getHcp={app.getHcp}
+          onBack={() => navigate({ name: "players" })}
+          onStart={(distance, playerIds) => navigate({ name: "flightRound", distance, playerIds })}
+        />
+      );
+    }
+    return (
+      <FlightRound
+        players={flightPlayers}
+        initialDistance={view.distance}
+        getHcp={app.getHcp}
+        onSaveAll={app.addRounds}
+        onBack={() => navigate({ name: "players" })}
       />
     );
   }

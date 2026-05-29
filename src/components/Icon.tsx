@@ -1,5 +1,5 @@
 interface Props {
-  name: "back" | "more" | "share";
+  name: "back" | "more" | "share" | "flight";
   size?: number;
 }
 
@@ -32,6 +32,14 @@ export default function Icon({ name, size = 24 }: Props) {
           <path d="M12 3v12" />
           <path d="M8 7l4-4 4 4" />
           <path d="M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7" />
+        </>
+      )}
+      {name === "flight" && (
+        <>
+          <circle cx="9" cy="8" r="3" />
+          <path d="M3.5 19v-.7c0-2.7 2.4-4.8 5.5-4.8s5.5 2.1 5.5 4.8v.7" />
+          <circle cx="17.5" cy="9" r="2.3" />
+          <path d="M16 13.4c2.6.1 4.5 1.9 4.5 4.6V19" />
         </>
       )}
     </svg>

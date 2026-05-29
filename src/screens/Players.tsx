@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import StarIcon from "../components/StarIcon";
+import Icon from "../components/Icon";
 import { hcpProgress } from "../rules";
 import type { Player, Round } from "../types";
 import { PLAYER_AVATARS, PLAYER_COLORS } from "../types";
@@ -13,9 +14,10 @@ interface Props {
   getHcp: (playerId: string) => number;
   onOpen: (playerId: string) => void;
   onAdd: (name: string, color: string, avatar: string | null) => Promise<Player>;
+  onFlight: () => void;
 }
 
-export default function Players({ players, rounds, backend, syncState, getHcp, onOpen, onAdd }: Props) {
+export default function Players({ players, rounds, backend, syncState, getHcp, onOpen, onAdd, onFlight }: Props) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [color, setColor] = useState(PLAYER_COLORS[0]);
@@ -150,6 +152,13 @@ export default function Players({ players, rounds, backend, syncState, getHcp, o
         ) : (
           <button className="btn btn-add" onClick={openAdd}>
             + Ny spiller
+          </button>
+        )}
+
+        {players.length >= 2 && !adding && (
+          <button className="btn btn-flight" onClick={onFlight}>
+            <Icon name="flight" size={20} />
+            Følg en flight
           </button>
         )}
       </div>
