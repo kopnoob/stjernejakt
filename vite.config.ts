@@ -11,6 +11,9 @@ export default defineConfig(({ command }) => ({
     // D1/D3/D4: installerbar PWA med offline-skall og auto-oppdatering.
     VitePWA({
       registerType: "autoUpdate",
+      // Vi registrerer service workeren selv (src/lib/pwa.ts) for å få
+      // oppdaterings-sjekk ved forgrunn + reload når ny versjon tar over.
+      injectRegister: false,
       includeAssets: ["favicon.svg", "apple-touch-icon.png"],
       manifest: {
         name: "Stjernejakt",
