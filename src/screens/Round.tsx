@@ -3,8 +3,10 @@ import StarIcon from "../components/StarIcon";
 import Icon from "../components/Icon";
 import ResultOverlay from "../components/ResultOverlay";
 import RulesModal from "../components/RulesModal";
+import DistanceMeasureModal from "../components/DistanceMeasureModal";
 import { evaluateRound } from "../rules";
 import { haptic } from "../lib/haptics";
+import { geolocationAvailable } from "../lib/geo";
 import { clearRoundDraft, getRoundDraft, holesHaveInput, saveRoundDraft } from "../lib/draft";
 import type { BadgeDef } from "../lib/badges";
 import type { HoleResult, Player, Round as RoundType } from "../types";
@@ -57,6 +59,7 @@ export default function Round({
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [measureOpen, setMeasureOpen] = useState(false);
   const [newBadges, setNewBadges] = useState<BadgeDef[]>([]);
 
   // A1: autosave-utkast (ikke ved redigering av eksisterende runde).
@@ -203,6 +206,14 @@ export default function Round({
               </button>
             ))}
           </div>
+          {geolocationAvailable() && (
+            <button
+              className="btn-textlink measure-link"
+              onClick={() => setMeasureOpen(true)}
+            >
+              📍 Mål avstand med GPS
+            </button>
+          )}
         </div>
       </section>
 
@@ -261,6 +272,13 @@ export default function Round({
       )}
 
       {rulesOpen && <RulesModal onClose={() => setRulesOpen(false)} />}
+
+      {measureOpen && (
+        <DistanceMeasureModal
+          onPick={(d) => setDistance(d)}
+          onClose={() => setMeasureOpen(false)}
+        />
+      )}
     </div>
   );
 }
