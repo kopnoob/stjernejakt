@@ -4,8 +4,14 @@ import { VitePWA } from "vite-plugin-pwa";
 
 // GitHub Pages serves project sites under /<repo>/, så base må matche
 // repo-navnet ved build. Lokalt brukes "/".
+// Bygge-stempel så brukeren kan se hvilken versjon enheten faktisk kjører.
+const BUILD_ID = new Date().toISOString().slice(0, 16).replace("T", " ");
+
 export default defineConfig(({ command }) => ({
   base: command === "build" ? "/stjernejakt/" : "/",
+  define: {
+    __APP_BUILD__: JSON.stringify(BUILD_ID),
+  },
   plugins: [
     react(),
     // D1/D3/D4: installerbar PWA med offline-skall og auto-oppdatering.

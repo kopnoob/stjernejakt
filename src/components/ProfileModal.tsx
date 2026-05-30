@@ -120,6 +120,8 @@ export default function ProfileModal({
       <button className="btn btn-ghost profile-done" onClick={onClose}>
         {firstRun ? "Jeg har lagret koden" : "Lukk"}
       </button>
+
+      <p className="profile-version muted">Versjon {__APP_BUILD__}</p>
     </Modal>
   );
 }

@@ -1484,6 +1484,7 @@
 }
 .profile-done { width: 100%; }
 .profile-sheet .text-input { width: 100%; }
+.profile-version { text-align: center; font-size: 11.5px; margin-top: 2px; }
 
 .menu-actions {
   display: flex;
