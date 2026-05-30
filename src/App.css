@@ -68,6 +68,16 @@
   flex-direction: column;
   gap: 1px;
 }
+/* Høyre side med flere elementer (f.eks. regler-«?» + meny/teller). */
+.topbar.has-actions {
+  grid-template-columns: 44px 1fr auto;
+}
+.topbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  justify-self: end;
+}
 .topbar-name {
   display: inline-flex;
   align-items: center;
@@ -495,13 +505,79 @@
   box-shadow: var(--shadow-sm);
 }
 
+/* ─── Merker (H4) ───────────────────────────────────────── */
+.badge-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.badge-row {
+  display: flex;
+  gap: 6px;
+}
+.badge {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 4px;
+  border-radius: var(--r-sm, 12px);
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  border: 2px solid transparent;
+  transition: transform 0.1s ease;
+}
+.badge:active { transform: scale(0.96); }
+.badge.is-open { border-color: var(--green); }
+.badge-emoji {
+  font-size: 24px;
+  line-height: 1;
+}
+.badge-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.15;
+  color: var(--ink-2);
+}
+.badge.is-earned .badge-label { color: var(--ink); }
+.badge.is-locked {
+  background: transparent;
+  box-shadow: none;
+  border-color: var(--line);
+}
+.badge.is-locked .badge-emoji { filter: grayscale(1); opacity: 0.4; }
+.badge-hint {
+  font-size: 12.5px;
+  text-align: center;
+  margin: 0;
+}
+
 /* ─── Reise (sti av utslag) ─────────────────────────────── */
 .journey {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
+/* Loddrett skinne bak nodene: grønn for tilbakelagt, grå videre. */
+.journey::before {
+  content: "";
+  position: absolute;
+  left: 31px;
+  top: 30px;
+  bottom: 30px;
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(
+    var(--green) 0 var(--journey-progress, 0%),
+    var(--line) var(--journey-progress, 0%) 100%
+  );
+}
 .step {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -525,12 +601,38 @@
 .step.is-future {
   opacity: 0.5;
 }
-.step-cone {
-  width: 16px;
-  height: 16px;
+/* Node på skinnen — bærer fremgangstilstanden for utslaget. */
+.step-node {
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  border: 2px solid rgba(0, 0, 0, 0.15);
+  border: 3px solid var(--line);
+  background: var(--card);
   flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  color: #fff;
+}
+.step.is-gold .step-node {
+  background: var(--green);
+  border-color: var(--green);
+}
+.step-node-pulse {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: node-pulse 1.5s ease-in-out infinite;
+}
+@keyframes node-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(31, 107, 67, 0.45); }
+  50% { transform: scale(1.18); box-shadow: 0 0 0 7px rgba(31, 107, 67, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .step-node-pulse { animation: none; }
 }
 .step-dist {
   font-family: var(--display);
@@ -572,6 +674,32 @@
   font-weight: 700;
   font-size: 15px;
   color: var(--green);
+}
+
+/* E6: coachmark for nye spillere — peker mot «Spill ▶». */
+.coachmark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+  background: var(--green-tint);
+  border-radius: var(--r);
+  padding: 12px 14px 6px;
+}
+.coachmark-text { font-size: 13.5px; color: var(--green-600); }
+.coachmark-arrow {
+  font-size: 22px;
+  line-height: 1;
+  color: var(--green);
+  animation: coach-bounce 1.2s ease-in-out infinite;
+}
+@keyframes coach-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(5px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .coachmark-arrow { animation: none; }
 }
 
 /* ─── Fullført-banner ───────────────────────────────────── */
@@ -1029,6 +1157,37 @@
   padding: 8px 12px;
   border-radius: var(--r-sm);
 }
+/* H4: nytt merke låst opp i feiringen. */
+.result-badges {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+.result-badge {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #8a5a00;
+  background: var(--gold-tint);
+  padding: 9px 12px;
+  border-radius: var(--r-sm);
+  animation: badge-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.result-badge-emoji { font-size: 22px; line-height: 1; }
+@keyframes badge-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .result-badge { animation: none; }
+}
+
 .btn-done { width: 100%; margin-top: 18px; }
 
 /* ─── Konfetti ──────────────────────────────────────────── */
@@ -1142,7 +1301,7 @@
 .flight-cards {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   flex: 1;
 }
 .flight-card {
@@ -1186,28 +1345,28 @@
 .fl-holes {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  gap: 6px;
 }
 .fl-hole {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 .fl-hole-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
 .fl-stepper {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 0;
   background: var(--card-sunken);
   border-radius: var(--r-pill);
-  padding: 4px;
+  padding: 3px;
   width: 100%;
   justify-content: space-between;
 }
 .fl-step {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: var(--card);
   box-shadow: var(--shadow-sm);
@@ -1225,14 +1384,40 @@
 .fl-val {
   font-family: var(--display);
   font-weight: 700;
-  font-size: 22px;
+  font-size: 21px;
   color: var(--ink);
-  min-width: 22px;
+  min-width: 16px;
   text-align: center;
+}
+
+/* A1: gjenoppta-banner for uferdig runde */
+.resume-banner {
+  background: var(--gold-tint);
+  border: 1px solid var(--gold-soft);
+  border-radius: var(--r);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.resume-text { font-size: 14px; font-weight: 600; color: #8a5a00; }
+.resume-actions { display: flex; gap: 8px; }
+.resume-go,
+.resume-x { flex: 1; min-height: 44px; padding: 10px; }
+
+/* C1: tall-pop ved hver +/− (re-trigges via key-bytte) */
+.num-pop {
+  display: inline-block;
+  animation: num-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes num-pop {
+  0% { transform: scale(0.7); }
+  60% { transform: scale(1.18); }
+  100% { transform: scale(1); }
 }
 .fl-pickup {
   width: 100%;
-  min-height: 32px;
+  min-height: 38px;
   border-radius: var(--r-sm);
   background: var(--card-sunken);
   color: var(--ink-2);
@@ -1282,6 +1467,15 @@
 /* ─── Turnering ─────────────────────────────────────────── */
 .entry-row { display: flex; gap: 8px; }
 .entry-row .btn-flight { flex: 1; }
+/* E3: forhåndsvis flight/turnering (dimmet) når man bare har én spiller. */
+.entry-row.is-locked { opacity: 0.5; }
+.btn-flight:disabled { cursor: default; }
+.btn-flight:disabled:active { background: var(--card); }
+.entry-hint {
+  text-align: center;
+  font-size: 13px;
+  margin: 0;
+}
 
 .tour-card {
   display: flex;
@@ -1592,6 +1786,14 @@
   color: var(--green-600);
   padding: 8px 12px;
   min-height: 44px;
+}
+/* E5: gjenopprett-lenke i tom tilstand — mindre, kan brytes over to linjer. */
+.empty-recover {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-2);
+  max-width: 290px;
+  line-height: 1.35;
 }
 
 @media (prefers-reduced-motion: reduce) {

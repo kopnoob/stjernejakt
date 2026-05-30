@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import StarIcon from "./StarIcon";
 import type { RoundResult } from "../rules";
+import type { BadgeDef } from "../lib/badges";
 import { playCelebration } from "../lib/sound";
 
 interface Props {
@@ -10,6 +11,8 @@ interface Props {
   playerName: string;
   /** Gull med færre slag enn noen tidligere gull-runde på dette utslaget. */
   isNewRecord?: boolean;
+  /** Merker som nettopp ble låst opp av denne runden (H4). */
+  newBadges?: BadgeDef[];
   onDone: () => void;
 }
 
@@ -24,6 +27,7 @@ export default function ResultOverlay({
   distance,
   playerName,
   isNewRecord,
+  newBadges,
   onDone,
 }: Props) {
   const [show, setShow] = useState(false);
@@ -81,6 +85,19 @@ export default function ResultOverlay({
 
         {result.promoted && (
           <p className="result-promo">🚀 Gull på 100 m — på tide med en hardere hcp!</p>
+        )}
+
+        {newBadges && newBadges.length > 0 && (
+          <div className="result-badges">
+            {newBadges.map((b) => (
+              <p key={b.id} className="result-badge">
+                <span className="result-badge-emoji" aria-hidden="true">
+                  {b.emoji}
+                </span>
+                Nytt merke: <strong>{b.label}</strong>!
+              </p>
+            ))}
+          </div>
         )}
 
         <button className="btn btn-primary btn-done" onClick={onDone}>

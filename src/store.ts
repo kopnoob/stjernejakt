@@ -332,7 +332,9 @@ class SupabaseStore implements Store {
     if (!sb) return { synced: false };
     await ensureAuth();
     try {
-      const { error } = await sb.from(table).insert(row);
+      // Idempotent: tapt svar på dårlig dekning → neste forsøk kolliderer ikke
+      // på primærnøkkel. ignoreDuplicates = INSERT ... ON CONFLICT DO NOTHING.
+      const { error } = await sb.from(table).upsert(row, { onConflict: "id", ignoreDuplicates: true });
       if (error) throw error;
       return { synced: true };
     } catch (e) {
@@ -367,12 +369,16 @@ class SupabaseStore implements Store {
     const newRounds = localRounds.filter((r) => !remoteRounds.some((x) => x.id === r.id));
     try {
       if (newPlayers.length) {
-        const { error } = await sb.from("players").insert(newPlayers.map(playerRow));
+        const { error } = await sb
+          .from("players")
+          .upsert(newPlayers.map(playerRow), { onConflict: "id", ignoreDuplicates: true });
         if (error) throw error;
         remotePlayers.push(...newPlayers);
       }
       if (newRounds.length) {
-        const { error } = await sb.from("rounds").insert(newRounds);
+        const { error } = await sb
+          .from("rounds")
+          .upsert(newRounds, { onConflict: "id", ignoreDuplicates: true });
         if (error) throw error;
         remoteRounds.push(...newRounds);
       }

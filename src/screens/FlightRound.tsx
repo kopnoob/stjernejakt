@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Icon from "../components/Icon";
 import StarIcon from "../components/StarIcon";
 import FlightResultOverlay from "../components/FlightResultOverlay";
 import { evaluateRound, type RoundResult } from "../rules";
+import { haptic } from "../lib/haptics";
+import { clearFlightDraft, getFlightDraft, holesHaveInput, saveFlightDraft } from "../lib/draft";
 import type { HoleResult, Player, Round } from "../types";
 import { DISTANCES, DISTANCE_COLOR } from "../types";
 
@@ -47,7 +49,34 @@ export default function FlightRound({ players, suggestedDistance, getHcp, onSave
   const [saving, setSaving] = useState(false);
   const [outcomes, setOutcomes] = useState<FlightOutcome[] | null>(null);
 
+  // A1: autosave-utkast for flighten.
+  const idsKey = players.map((p) => p.id).join(",");
+  const [initialDraft] = useState(() => getFlightDraft(players.map((p) => p.id)));
+  const resumable = !!(
+    initialDraft && Object.values(initialDraft.holesBy ?? {}).some(holesHaveInput)
+  );
+  const [dismissedResume, setDismissedResume] = useState(false);
+  const showResume = resumable && !dismissedResume;
+
+  useEffect(() => {
+    if (Object.values(holesBy).some(holesHaveInput)) {
+      saveFlightDraft(idsKey.split(","), { distanceBy, holesBy });
+    }
+  }, [holesBy, distanceBy, idsKey]);
+
+  function resumeDraft() {
+    if (!initialDraft) return;
+    if (initialDraft.distanceBy) setDistanceBy(initialDraft.distanceBy);
+    if (initialDraft.holesBy) setHolesBy(initialDraft.holesBy);
+    setDismissedResume(true);
+  }
+  function discardDraft() {
+    clearFlightDraft(idsKey.split(","));
+    setDismissedResume(true);
+  }
+
   function bump(playerId: string, i: number, delta: number) {
+    haptic(8);
     setHolesBy((prev) => {
       const holes = prev[playerId].slice();
       const strokes = Math.max(0, Math.min(MAX_STROKES, holes[i].strokes + delta));
@@ -56,6 +85,7 @@ export default function FlightRound({ players, suggestedDistance, getHcp, onSave
     });
   }
   function togglePickup(playerId: string, i: number) {
+    haptic(8);
     setHolesBy((prev) => {
       const holes = prev[playerId].slice();
       holes[i] = { ...holes[i], pickedUp: !holes[i].pickedUp };
@@ -72,6 +102,7 @@ export default function FlightRound({ players, suggestedDistance, getHcp, onSave
 
   async function handleSaveAll() {
     if (!allReady || saving) return;
+    haptic([18, 40, 18]);
     setSaving(true);
     try {
       const entries = players.map((p) => ({
@@ -81,6 +112,7 @@ export default function FlightRound({ players, suggestedDistance, getHcp, onSave
         holes: holesBy[p.id],
       }));
       await onSaveAll(entries);
+      clearFlightDraft(idsKey.split(",")); // utkast fullført → fjern
       setOutcomes(
         players.map((p) => ({
           player: p,
@@ -107,6 +139,20 @@ export default function FlightRound({ players, suggestedDistance, getHcp, onSave
           {readyCount}/{players.length}
         </span>
       </header>
+
+      {showResume && (
+        <div className="resume-banner">
+          <span className="resume-text">↩ Uferdig flight — fortsett der dere slapp?</span>
+          <div className="resume-actions">
+            <button className="btn btn-primary resume-go" onClick={resumeDraft}>
+              Fortsett
+            </button>
+            <button className="btn btn-ghost resume-x" onClick={discardDraft}>
+              Forkast
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flight-cards">
         {players.map((p) => (
@@ -212,7 +258,10 @@ function PlayerScoreCard({
               >
                 −
               </button>
-              <span className="fl-val tabnum">
+              <span
+                className="fl-val tabnum num-pop"
+                key={holes[i].pickedUp ? "x" : holes[i].strokes}
+              >
                 {holes[i].pickedUp ? "✕" : holes[i].strokes || "–"}
               </span>
               <button

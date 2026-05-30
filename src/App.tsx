@@ -9,6 +9,7 @@ import Tournament from "./screens/Tournament";
 import ShareClaim from "./screens/ShareClaim";
 import { useApp } from "./useApp";
 import { hcpProgress } from "./rules";
+import { newlyUnlocked } from "./lib/badges";
 import { DEFAULT_HCP } from "./types";
 
 type View =
@@ -260,7 +261,9 @@ export default function App() {
       initialDistance={view.distance ?? 30}
       recordsByDistance={recordsByDistance}
       onSave={async (hcp, distance, holes) => {
-        await app.addRound(player.id, hcp, distance, holes);
+        // H4: hvilke merker låste denne runden opp? (før vs etter)
+        const newRound = await app.addRound(player.id, hcp, distance, holes);
+        return newlyUnlocked(playerRounds, [...playerRounds, newRound]);
       }}
       onBack={() => navigate({ name: "board", playerId: player.id })}
     />

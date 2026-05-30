@@ -1,8 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import StarIcon from "../components/StarIcon";
 import Icon from "../components/Icon";
 import ResultOverlay from "../components/ResultOverlay";
+import RulesModal from "../components/RulesModal";
 import { evaluateRound } from "../rules";
+import { haptic } from "../lib/haptics";
+import { clearRoundDraft, getRoundDraft, holesHaveInput, saveRoundDraft } from "../lib/draft";
+import type { BadgeDef } from "../lib/badges";
 import type { HoleResult, Player, Round as RoundType } from "../types";
 import { DISTANCES, DISTANCE_COLOR, HOLES_PER_ROUND } from "../types";
 
@@ -14,7 +18,8 @@ interface Props {
   recordsByDistance: Record<number, number | null>;
   /** Hvis satt: rediger en eksisterende runde (forhåndsfyll, ingen feiring). */
   existing?: RoundType;
-  onSave: (hcp: number, distance: number, holes: HoleResult[]) => Promise<void>;
+  /** Lagrer runden. Returnerer merker som ble låst opp (H4), eller void (redigering). */
+  onSave: (hcp: number, distance: number, holes: HoleResult[]) => Promise<BadgeDef[] | void>;
   onBack: () => void;
 }
 
@@ -51,8 +56,35 @@ export default function Round({
   );
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const [newBadges, setNewBadges] = useState<BadgeDef[]>([]);
+
+  // A1: autosave-utkast (ikke ved redigering av eksisterende runde).
+  const [initialDraft] = useState(() => (isEdit ? null : getRoundDraft(player.id)));
+  const resumable = !!(initialDraft && initialDraft.hcp === hcp && holesHaveInput(initialDraft.holes));
+  const [dismissedResume, setDismissedResume] = useState(false);
+  const showResume = resumable && !dismissedResume;
+
+  // Skriv utkast løpende (kun når noe er tastet, så et tomt skjema ikke
+  // overskriver et eksisterende utkast ved oppstart).
+  useEffect(() => {
+    if (isEdit) return;
+    if (holesHaveInput(holes)) saveRoundDraft(player.id, { hcp, distance, holes });
+  }, [holes, distance, hcp, isEdit, player.id]);
+
+  function resumeDraft() {
+    if (!initialDraft) return;
+    setDistance(initialDraft.distance);
+    setHoles(initialDraft.holes.map((h) => ({ ...h })));
+    setDismissedResume(true);
+  }
+  function discardDraft() {
+    clearRoundDraft(player.id);
+    setDismissedResume(true);
+  }
 
   function bumpStrokes(i: number, delta: number) {
+    haptic(8);
     setHoles((prev) => {
       const next = prev.slice();
       // +/− henter tilbake tall-feltet hvis hullet var plukket opp.
@@ -62,6 +94,7 @@ export default function Round({
     });
   }
   function togglePickedUp(i: number) {
+    haptic(8);
     setHoles((prev) => {
       const next = prev.slice();
       next[i] = { ...next[i], pickedUp: !next[i].pickedUp };
@@ -95,13 +128,16 @@ export default function Round({
   async function handleSave() {
     // F3: lås mot dobbel-lagring (rask dobbelttrykk → to runder).
     if (!allSet || saving || saved) return;
+    haptic([18, 40, 18]);
     setSaving(true);
     try {
-      await onSave(hcp, distance, holes);
+      const unlocked = await onSave(hcp, distance, holes);
       if (isEdit) {
         onBack(); // redigering: ingen feiring, rett tilbake til historikken
         return;
       }
+      clearRoundDraft(player.id); // utkast fullført → fjern
+      setNewBadges(Array.isArray(unlocked) ? unlocked : []);
       setSaved(true); // viser feiringen først når lagring er fullført
     } finally {
       setSaving(false);
@@ -110,7 +146,7 @@ export default function Round({
 
   return (
     <div className="screen round-screen">
-      <header className="topbar">
+      <header className="topbar has-actions">
         <button className="icon-btn" onClick={onBack} aria-label="Tilbake">
           <Icon name="back" size={22} />
         </button>
@@ -121,10 +157,35 @@ export default function Round({
           </span>
           <span className="topbar-hcp">{isEdit ? "Rediger · " : ""}Handicap {hcp}</span>
         </span>
-        <span className="round-prog tabnum" aria-label="Hull spilt">
-          {setHolesList.length}/{HOLES_PER_ROUND}
+        <span className="topbar-actions">
+          <button
+            className="icon-btn"
+            onClick={() => setRulesOpen(true)}
+            aria-label="Slik fungerer Stjernejakt"
+          >
+            <Icon name="info" size={20} />
+          </button>
+          <span className="round-prog tabnum" aria-label="Hull spilt">
+            {setHolesList.length}/{HOLES_PER_ROUND}
+          </span>
         </span>
       </header>
+
+      {showResume && initialDraft && (
+        <div className="resume-banner">
+          <span className="resume-text">
+            ↩ Uferdig runde ({initialDraft.distance} m) — fortsett der du slapp?
+          </span>
+          <div className="resume-actions">
+            <button className="btn btn-primary resume-go" onClick={resumeDraft}>
+              Fortsett
+            </button>
+            <button className="btn btn-ghost resume-x" onClick={discardDraft}>
+              Forkast
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Oppsett: kun utslag (hcp er fast). Slag beholdes ved bytte av utslag. */}
       <section className="setup">
@@ -194,9 +255,12 @@ export default function Round({
           distance={distance}
           playerName={player.name}
           isNewRecord={isNewRecord}
+          newBadges={newBadges}
           onDone={onBack}
         />
       )}
+
+      {rulesOpen && <RulesModal onClose={() => setRulesOpen(false)} />}
     </div>
   );
 }
@@ -241,7 +305,9 @@ function HoleCard({
             −
           </button>
           <span className="step-value tabnum">
-            <strong>{hole.pickedUp ? "✕" : hole.strokes || "–"}</strong>
+            <strong key={hole.pickedUp ? "x" : hole.strokes} className="num-pop">
+              {hole.pickedUp ? "✕" : hole.strokes || "–"}
+            </strong>
             <span className="step-unit">{hole.pickedUp ? "plukket opp" : "slag"}</span>
           </span>
           <button

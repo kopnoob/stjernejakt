@@ -83,6 +83,11 @@ export default function Tournaments({ players, onBack, onOpen }: Props) {
 
       {creating && (
         <div className="add-form">
+          <p className="flight-intro muted">
+            En turnering er en felles runde over flere hull. Dere fyller inn slagene til alle
+            spillerne hull for hull, og ledertavlen kårer en vinner. Velg navn, antall hull og hvem
+            som er med.
+          </p>
           <span className="field-label muted">Navn</span>
           <input
             className="text-input"

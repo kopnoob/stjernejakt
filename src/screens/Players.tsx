@@ -29,14 +29,20 @@ export default function Players({ players, rounds, backend, syncState, getHcp, o
   const [name, setName] = useState("");
   const [color, setColor] = useState(PLAYER_COLORS[0]);
   const [avatar, setAvatar] = useState<string | null>(null);
-  // Vis gjenopprettingskoden automatisk én gang når en ny profil er laget.
-  // Initialiseres fra localStorage ved første render (ingen setState i effekt).
-  const [profileOpen, setProfileOpen] = useState<boolean>(() => recoveryIsNew());
-  const [firstRun, setFirstRun] = useState<boolean>(() => recoveryIsNew());
+  // E2: Vis gjenopprettingskoden FØRST etter at brukeren har lagret sin første
+  // runde — ikke kast en kode-popup i ansiktet på dem ved aller første åpning.
+  // (Players re-monteres når man navigerer hjem, så initialisatoren kjører på
+  // nytt etter at første runde er lagret.)
+  const showFirstRunCode = recoveryIsNew() && rounds.length > 0;
+  const [profileOpen, setProfileOpen] = useState<boolean>(() => showFirstRunCode);
+  const [firstRun, setFirstRun] = useState<boolean>(() => showFirstRunCode);
   const [rulesOpen, setRulesOpen] = useState(false);
 
   useEffect(() => {
-    if (recoveryIsNew()) clearRecoveryNew();
+    // Når første-gangs-koden faktisk vises (etter første runde), marker den som
+    // vist så den ikke dukker opp igjen. Før første runde lar vi flagget ligge.
+    if (recoveryIsNew() && rounds.length > 0) clearRecoveryNew();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Per spiller: nåværende hcp + antall gull i det hcp-et (mer relevant
@@ -121,6 +127,17 @@ export default function Players({ players, rounds, backend, syncState, getHcp, o
             <button className="btn-textlink" onClick={() => setRulesOpen(true)}>
               Les reglene
             </button>
+            {backend === "supabase" && (
+              <button
+                className="btn-textlink empty-recover"
+                onClick={() => {
+                  setFirstRun(false);
+                  setProfileOpen(true);
+                }}
+              >
+                Spilt før på en annen enhet? Hent spillerne med en kode
+              </button>
+            )}
           </div>
         )}
 
@@ -232,21 +249,35 @@ export default function Players({ players, rounds, backend, syncState, getHcp, o
           </button>
         )}
 
-        {!sorting && players.length >= 2 && !adding && (
+        {!sorting && !adding && players.length >= 1 && (
           <>
-            <div className="entry-row">
-              <button className="btn btn-flight" onClick={onFlight}>
+            <div className={`entry-row ${players.length < 2 ? "is-locked" : ""}`}>
+              <button
+                className="btn btn-flight"
+                onClick={onFlight}
+                disabled={players.length < 2}
+              >
                 <Icon name="flight" size={20} />
                 Følg en flight
               </button>
-              <button className="btn btn-flight" onClick={onTournament}>
+              <button
+                className="btn btn-flight"
+                onClick={onTournament}
+                disabled={players.length < 2}
+              >
                 <Icon name="trophy" size={20} />
                 Turnering
               </button>
             </div>
-            <button className="btn-textlink" onClick={() => setSorting(true)}>
-              Endre rekkefølge
-            </button>
+            {players.length < 2 ? (
+              <p className="entry-hint muted">
+                Legg til en spiller til for å spille flight eller turnering 👫
+              </p>
+            ) : (
+              <button className="btn-textlink" onClick={() => setSorting(true)}>
+                Endre rekkefølge
+              </button>
+            )}
           </>
         )}
       </div>

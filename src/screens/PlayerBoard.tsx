@@ -1,11 +1,13 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import StarIcon from "../components/StarIcon";
 import Icon from "../components/Icon";
 import Modal from "../components/Modal";
+import RulesModal from "../components/RulesModal";
 import { buildMatrix, hcpProgress, nextHcpDown } from "../rules";
 import type { Player, Round, Star } from "../types";
 import { DISTANCES, DISTANCE_COLOR, HCP_RANGE, MAX_STARS_PER_HCP } from "../types";
 import { buildDiploma, shareDiploma } from "../lib/diploma";
+import { BADGES, earnedBadges } from "../lib/badges";
 
 interface Props {
   player: Player;
@@ -28,6 +30,8 @@ export default function PlayerBoard({ player, rounds, currentHcp, onBack, onStar
   const [switchHcp, setSwitchHcp] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const [openBadge, setOpenBadge] = useState<string | null>(null);
   const [accessBusy, setAccessBusy] = useState(false);
   const [accessLink, setAccessLink] = useState<string | null>(null);
   const [accessMsg, setAccessMsg] = useState<string | null>(null);
@@ -73,6 +77,10 @@ export default function PlayerBoard({ player, rounds, currentHcp, onBack, onStar
   const prog = useMemo(() => hcpProgress(playerRounds, hcp), [playerRounds, hcp]);
   const downHcp = nextHcpDown(hcp);
 
+  // H4: opptjente milepæl-merker (på tvers av alle handicap).
+  const earned = useMemo(() => earnedBadges(playerRounds), [playerRounds]);
+  const openBadgeDef = openBadge ? BADGES.find((b) => b.id === openBadge) ?? null : null;
+
   // Hvilke hcp er ferdig (alle 7 gull) — vises i hcp-velgeren.
   const completedHcps = useMemo(() => {
     const set = new Set<number>();
@@ -114,7 +122,7 @@ export default function PlayerBoard({ player, rounds, currentHcp, onBack, onStar
 
   return (
     <div className="screen">
-      <header className="topbar">
+      <header className="topbar has-actions">
         <button className="icon-btn" onClick={onBack} aria-label="Tilbake">
           <Icon name="back" size={22} />
         </button>
@@ -124,9 +132,18 @@ export default function PlayerBoard({ player, rounds, currentHcp, onBack, onStar
           </span>
           {player.name}
         </span>
-        <button className="icon-btn" onClick={() => setMenuOpen(true)} aria-label="Mer">
-          {accessBusy ? <span className="mini-spin" /> : <Icon name="more" size={22} />}
-        </button>
+        <span className="topbar-actions">
+          <button
+            className="icon-btn"
+            onClick={() => setRulesOpen(true)}
+            aria-label="Slik fungerer Stjernejakt"
+          >
+            <Icon name="info" size={20} />
+          </button>
+          <button className="icon-btn" onClick={() => setMenuOpen(true)} aria-label="Mer">
+            {accessBusy ? <span className="mini-spin" /> : <Icon name="more" size={22} />}
+          </button>
+        </span>
       </header>
 
       {/* Hcp-fokus-kort */}
@@ -174,6 +191,38 @@ export default function PlayerBoard({ player, rounds, currentHcp, onBack, onStar
         )}
       </div>
 
+      {/* H4: merke-rad — opptjente i farger, låste dimmet. Trykk for tips. */}
+      <div className="badge-section">
+        <div className="badge-row" aria-label="Merker">
+          {BADGES.map((b) => {
+            const has = earned.has(b.id);
+            return (
+              <button
+                key={b.id}
+                className={`badge ${has ? "is-earned" : "is-locked"} ${
+                  openBadge === b.id ? "is-open" : ""
+                }`}
+                onClick={() => setOpenBadge((cur) => (cur === b.id ? null : b.id))}
+                aria-label={`${b.label}${has ? " – oppnådd" : " – låst"}`}
+                aria-pressed={openBadge === b.id}
+              >
+                <span className="badge-emoji" aria-hidden="true">
+                  {b.emoji}
+                </span>
+                <span className="badge-label">{b.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        {openBadgeDef && (
+          <p className="badge-hint muted">
+            {earned.has(openBadgeDef.id)
+              ? `${openBadgeDef.emoji} ${openBadgeDef.label} – oppnådd!`
+              : `🔒 ${openBadgeDef.hint}`}
+          </p>
+        )}
+      </div>
+
       {/* Reise / oversikt / historikk */}
       <div className="mode-toggle">
         <button className={mode === "journey" ? "is-on" : ""} onClick={() => setMode("journey")}>
@@ -192,6 +241,7 @@ export default function PlayerBoard({ player, rounds, currentHcp, onBack, onStar
           hcp={hcp}
           prog={prog}
           downHcp={downHcp}
+          firstTime={playerRounds.length === 0}
           onStart={(d) => onStart(hcp, d)}
           onGoDown={() => downHcp && onSetHcp(downHcp)}
         />
@@ -208,6 +258,8 @@ export default function PlayerBoard({ player, rounds, currentHcp, onBack, onStar
         <Icon name="share" size={18} />
         {sharing ? "Lager diplom …" : "Del diplom"}
       </button>
+
+      {rulesOpen && <RulesModal onClose={() => setRulesOpen(false)} />}
 
       {menuOpen && (
         <Modal onClose={() => setMenuOpen(false)} labelledBy="menu-title">
@@ -299,15 +351,23 @@ function Journey({
   hcp,
   prog,
   downHcp,
+  firstTime,
   onStart,
   onGoDown,
 }: {
   hcp: number;
   prog: ReturnType<typeof hcpProgress>;
   downHcp: number | null;
+  firstTime: boolean;
   onStart: (distance: number) => void;
   onGoDown: () => void;
 }) {
+  // Hvor langt skinnen er «tilbakelagt» (grønn): fram til neste-noden, eller
+  // hele veien når alt er gull.
+  const nextIdx =
+    prog.nextDistance == null ? DISTANCES.length - 1 : DISTANCES.indexOf(prog.nextDistance);
+  const journeyProgressPct =
+    DISTANCES.length <= 1 ? 0 : (Math.max(0, nextIdx) / (DISTANCES.length - 1)) * 100;
   return (
     <>
       {prog.completed && (
@@ -329,27 +389,54 @@ function Journey({
         </div>
       )}
 
-      <div className="journey">
+      {/* E6: coachmark for helt nye spillere — peker mot «Spill ▶» på neste
+          utslag (som her alltid er det øverste, siden ingen runder er spilt). */}
+      {firstTime && prog.nextDistance !== null && (
+        <div className="coachmark">
+          <span className="coachmark-text">
+            Klar? Trykk <strong>«Spill&nbsp;▶»</strong> på {prog.nextDistance} m for å starte den
+            første runden.
+          </span>
+          <span className="coachmark-arrow" aria-hidden="true">
+            ↓
+          </span>
+        </div>
+      )}
+
+      {/* J1: reisen som en faktisk sti — loddrett skinne (grønn for tilbakelagt,
+          grå videre), én node pr utslag: ✓ for gull, pulserende «du er her» på
+          neste, og blek node for det som gjenstår. */}
+      <div
+        className="journey"
+        style={{ "--journey-progress": `${journeyProgressPct}%` } as CSSProperties}
+      >
         {DISTANCES.map((d) => {
           const star: Star = prog.bestStarByDistance[d] ?? "none";
           const pr = prog.bestGoldStrokesByDistance[d];
           const isNext = d === prog.nextDistance;
+          const done = star === "gold";
           const isFuture = prog.nextDistance !== null && d > prog.nextDistance && star === "none";
           return (
             <button
               key={d}
-              className={`step ${isNext ? "is-next" : ""} ${star === "gold" ? "is-gold" : ""} ${
+              className={`step ${isNext ? "is-next" : ""} ${done ? "is-gold" : ""} ${
                 isFuture ? "is-future" : ""
               }`}
               onClick={() => onStart(d)}
             >
-              <span className="step-cone" style={{ background: DISTANCE_COLOR[d] }} />
+              <span
+                className="step-node"
+                style={done ? undefined : { borderColor: DISTANCE_COLOR[d] }}
+                aria-hidden="true"
+              >
+                {done ? "✓" : isNext ? <span className="step-node-pulse" /> : null}
+              </span>
               <span className="step-dist">{d} m</span>
               <span className="step-mid">
-                {isNext && <span className="next-tag">Neste</span>}
+                {isNext && <span className="next-tag">Du er her</span>}
                 {isNext && star !== "none" && <StarIcon variant={star} size={18} outline={false} />}
                 {/* A4: vis personlig rekord på fullførte gull-utslag. */}
-                {!isNext && star === "gold" && pr != null ? (
+                {!isNext && done && pr != null ? (
                   <span className="step-pr">🏆 rekord {pr} slag</span>
                 ) : (
                   !isNext && <span className="step-star-label muted">{starLabel(star)}</span>
