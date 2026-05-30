@@ -1,14 +1,17 @@
-// Robust PWA-oppdatering.
-//
-// Standard-registreringen fra vite-plugin-pwa registrerer bare service
-// workeren — den sjekker verken etter nye versjoner jevnlig eller laster siden
-// på nytt når en ny worker tar over. På iOS-hjemskjerm (der appen sjelden
-// sjekker selv) gjør det at man kan sitte fast på en gammel versjon.
+// Robust, automatisk PWA-oppdatering.
 //
 // Service workeren bygges med skipWaiting + clientsClaim (registerType:
-// autoUpdate), så en ny worker aktiveres umiddelbart. Vi trenger bare å:
-//   1) tvinge en oppdaterings-sjekk når appen åpnes/får fokus (+ periodisk)
-//   2) laste siden på nytt når den nye workeren faktisk tar kontroll.
+// autoUpdate), så en ny worker aktiveres umiddelbart når den er lastet ned.
+// Vi sørger for at den faktisk LASTES ned og at siden friskes opp:
+//
+//   1) Sjekk etter ny versjon ved «trygge» øyeblikk — når appen åpnes / kommer
+//      i forgrunn / får fokus / man navigerer. Det er nettopp da man er på vei
+//      INN i et skjermbilde, så en reload er ikke forstyrrende (ingen brå
+//      reload midt i en runde-inntasting).
+//   2) Når en ny worker tar kontroll → last siden på nytt (én gang).
+//
+// Resultat: så lenge du er på nett, oppdateres appen av seg selv neste gang du
+// åpner den. Ingen manuelle steg etter at du først er på denne versjonen.
 
 export function registerPwa() {
   if (!import.meta.env.PROD) return; // ingen SW i dev
@@ -28,13 +31,19 @@ export function registerPwa() {
     navigator.serviceWorker
       .register(`${base}sw.js`, { scope: base })
       .then((reg) => {
+        let last = 0;
         const check = () => {
-          if (document.visibilityState === "visible") reg.update().catch(() => {});
+          if (document.visibilityState !== "visible") return;
+          const now = Date.now();
+          if (now - last < 5000) return; // throttle mot dobbeltsjekk
+          last = now;
+          reg.update().catch(() => {});
         };
-        check(); // sjekk med en gang
-        document.addEventListener("visibilitychange", check); // ved forgrunn (iOS)
+        check(); // sjekk med en gang ved oppstart
+        // Trygge øyeblikk: forgrunn (iOS), fokus, og in-app-navigasjon.
+        document.addEventListener("visibilitychange", check);
         window.addEventListener("focus", check);
-        setInterval(check, 60 * 60 * 1000); // sikkerhetsnett hver time
+        window.addEventListener("hashchange", check);
       })
       .catch(() => {
         /* offline ved første åpning — registreres ved neste besøk */
