@@ -4,6 +4,8 @@ import Modal from "./Modal";
 interface Props {
   recoveryCode: string | null;
   firstRun: boolean;
+  /** Antall spillere på denne enheten nå — for sammenslåings-advarsel. */
+  localPlayerCount: number;
   onRecover: (code: string) => Promise<number>;
   onClose: () => void;
 }
@@ -12,11 +14,18 @@ interface Props {
  * Profil-ark: viser gjenopprettingskoden (nøkkelen til spillerne dine på en ny
  * enhet) og lar deg gjenopprette med en kode fra en annen enhet.
  */
-export default function ProfileModal({ recoveryCode, firstRun, onRecover, onClose }: Props) {
+export default function ProfileModal({
+  recoveryCode,
+  firstRun,
+  localPlayerCount,
+  onRecover,
+  onClose,
+}: Props) {
   const [copied, setCopied] = useState(false);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [pendingMerge, setPendingMerge] = useState(false);
 
   async function copy() {
     if (!recoveryCode) return;
@@ -32,6 +41,13 @@ export default function ProfileModal({ recoveryCode, firstRun, onRecover, onClos
   async function doRecover() {
     const c = code.trim();
     if (!c || busy) return;
+    // Sammenslåings-advarsel: har du egne spillere fra før, blir de delt med
+    // den andre kontoen. Be om bekreftelse først.
+    if (localPlayerCount > 0 && !pendingMerge) {
+      setPendingMerge(true);
+      return;
+    }
+    setPendingMerge(false);
     setBusy(true);
     setMsg(null);
     try {
@@ -69,13 +85,36 @@ export default function ProfileModal({ recoveryCode, firstRun, onRecover, onClos
         className="text-input"
         placeholder="Lim inn kode"
         value={code}
-        onChange={(e) => setCode(e.target.value)}
+        onChange={(e) => {
+          setCode(e.target.value);
+          setPendingMerge(false);
+        }}
         autoCapitalize="characters"
         spellCheck={false}
       />
+
+      {pendingMerge && (
+        <p className="profile-warn">
+          Du har {localPlayerCount} spiller{localPlayerCount === 1 ? "" : "e"} fra før. Å legge inn
+          en kode <strong>slår dem sammen</strong> med den delte kontoen — begge enheter ser alt.
+          (Vil du heller dele bare én spiller, bruk «Del tilgang» på spilleren i stedet.)
+        </p>
+      )}
+
       <button className="btn btn-primary" onClick={doRecover} disabled={!code.trim() || busy}>
-        {busy ? "Henter …" : "Hent spillerne mine"}
+        {busy
+          ? "Henter …"
+          : pendingMerge
+          ? "Slå sammen og fortsett"
+          : localPlayerCount > 0
+          ? "Legg til kode"
+          : "Hent spillerne mine"}
       </button>
+      {pendingMerge && (
+        <button className="btn btn-ghost" onClick={() => setPendingMerge(false)}>
+          Avbryt
+        </button>
+      )}
       {msg && <p className="profile-msg">{msg}</p>}
 
       <button className="btn btn-ghost profile-done" onClick={onClose}>

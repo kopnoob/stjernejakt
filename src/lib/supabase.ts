@@ -101,6 +101,20 @@ async function ensureProfile(sb: SupabaseClient, uid: string): Promise<void> {
   }
 }
 
+/** Sørg for at en lokal gjenopprettingskode finnes FØR appen rendrer, så
+ *  første-gangs-visningen av koden ikke avhenger av async-innlogging. */
+export function ensureLocalRecoveryCode(): void {
+  try {
+    if (!supabaseConfigured) return;
+    if (!localStorage.getItem(LS_RECOVERY)) {
+      localStorage.setItem(LS_RECOVERY, generateRecoveryCode());
+      localStorage.setItem(LS_RECOVERY_NEW, "1");
+    }
+  } catch {
+    /* ignorer */
+  }
+}
+
 export function getRecoveryCode(): string | null {
   try {
     return localStorage.getItem(LS_RECOVERY);

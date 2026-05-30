@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   claimShareToken,
   createShareToken,
   getCurrentHcp,
+  getPlayerOrder,
   newId,
   recoverProfile,
   setCurrentHcpLocal,
+  setPlayerOrder,
   store,
 } from "./store";
 import { cachedUid } from "./lib/supabase";
@@ -24,6 +26,8 @@ export function useApp() {
   );
   // current_hcp er lokal enhets-preferanse; hold en kopi i state for re-render.
   const [hcpMap, setHcpMap] = useState<Record<string, number>>({});
+  // Lokal spiller-rekkefølge (enhets-preferanse).
+  const [order, setOrder] = useState<string[]>(() => getPlayerOrder());
   const reloadRef = useRef<() => void>(() => {});
 
   const reload = useCallback(async () => {
@@ -52,12 +56,26 @@ export function useApp() {
     };
   }, [reload]);
 
-  // F2: prøv synk på nytt når nett kommer tilbake.
+  // Re-synk når nett kommer tilbake OG når appen åpnes/får fokus, så data fra
+  // den andre forelderens enhet dukker opp. Throttlet for å unngå hamring.
   useEffect(() => {
     if (store.backend !== "supabase") return;
-    const onOnline = () => reloadRef.current();
-    window.addEventListener("online", onOnline);
-    return () => window.removeEventListener("online", onOnline);
+    let last = 0;
+    const refresh = () => {
+      if (document.visibilityState === "hidden") return;
+      const now = Date.now();
+      if (now - last < 8000) return;
+      last = now;
+      reloadRef.current();
+    };
+    window.addEventListener("online", refresh);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener("online", refresh);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, []);
 
   function applySync(synced: boolean) {
@@ -82,6 +100,22 @@ export function useApp() {
     },
     [],
   );
+
+  // Spillere i lokal rekkefølge; ikke-sorterte (nye) legges sist (eldst først).
+  const orderedPlayers = useMemo(() => {
+    const idx = new Map(order.map((id, i) => [id, i]));
+    return [...players].sort((a, b) => {
+      const ia = idx.has(a.id) ? idx.get(a.id)! : Infinity;
+      const ib = idx.has(b.id) ? idx.get(b.id)! : Infinity;
+      if (ia !== ib) return ia - ib;
+      return a.created_at.localeCompare(b.created_at);
+    });
+  }, [players, order]);
+
+  const reorderPlayers = useCallback((ids: string[]) => {
+    setPlayerOrder(ids);
+    setOrder(ids);
+  }, []);
 
   const getHcp = useCallback((playerId: string): number => hcpMap[playerId] ?? 5, [hcpMap]);
 
@@ -147,6 +181,38 @@ export function useApp() {
     [],
   );
 
+  // ─── Rediger / slett sesjon ──────────────────────────────────────────────
+
+  const editRound = useCallback(
+    async (roundId: string, hcp: number, distance: number, holes: HoleResult[]): Promise<void> => {
+      const existing = rounds.find((r) => r.id === roundId);
+      if (!existing) return;
+      const res = evaluateRound(holes, hcp, distance);
+      const updated: Round = {
+        ...existing,
+        hcp,
+        distance,
+        holes,
+        star: res.star as Star,
+        holed_count: res.holedCount,
+        total_strokes: res.totalStrokes,
+      };
+      setRounds((prev) => prev.map((r) => (r.id === roundId ? updated : r)));
+      applySync((await store.updateRound(updated)).synced);
+    },
+    [rounds],
+  );
+
+  const deleteRound = useCallback(
+    async (roundId: string): Promise<void> => {
+      const existing = rounds.find((r) => r.id === roundId);
+      if (!existing) return;
+      setRounds((prev) => prev.filter((r) => r.id !== roundId));
+      applySync((await store.updateRound({ ...existing, deleted: true })).synced);
+    },
+    [rounds],
+  );
+
   // ─── Multi-enhet: deling + gjenoppretting ───────────────────────────────
 
   /** Lag en delingslenke til en spiller (eller null hvis offline/feil). */
@@ -182,14 +248,17 @@ export function useApp() {
   );
 
   return {
-    players,
+    players: orderedPlayers,
     rounds,
     loading,
     syncState,
+    reorderPlayers,
     addPlayer,
     deletePlayer,
     addRound,
     addRounds,
+    editRound,
+    deleteRound,
     getHcp,
     setCurrentHcp,
     shareLink,

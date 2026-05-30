@@ -15,6 +15,7 @@ type View =
   | { name: "players" }
   | { name: "board"; playerId: string }
   | { name: "round"; playerId: string; hcp: number; distance: number }
+  | { name: "editRound"; playerId: string; roundId: string }
   | { name: "flight" }
   | { name: "flightRound"; playerIds: string[] }
   | { name: "tournaments" }
@@ -50,6 +51,9 @@ function parseHash(): View {
     if (parts[2] === "r" && parts[3] && parts[4]) {
       return { name: "round", playerId: parts[1], hcp: Number(parts[3]), distance: Number(parts[4]) };
     }
+    if (parts[2] === "edit" && parts[3]) {
+      return { name: "editRound", playerId: parts[1], roundId: parts[3] };
+    }
     return { name: "board", playerId: parts[1] };
   }
   return { name: "players" };
@@ -58,6 +62,7 @@ function parseHash(): View {
 function toHash(v: View): string {
   if (v.name === "board") return `#/p/${v.playerId}`;
   if (v.name === "round") return `#/p/${v.playerId}/r/${v.hcp}/${v.distance}`;
+  if (v.name === "editRound") return `#/p/${v.playerId}/edit/${v.roundId}`;
   if (v.name === "flight") return "#/flight";
   if (v.name === "flightRound") return `#/flight/r/${v.playerIds.join(",")}`;
   if (v.name === "tournaments") return "#/turnering";
@@ -88,7 +93,7 @@ export default function App() {
   // Hvis ruten peker på en spiller som ikke finnes (slettet / ukjent lenke),
   // send tilbake til lista — i en effekt, ikke under render.
   const missingPlayer =
-    (view.name === "board" || view.name === "round") &&
+    (view.name === "board" || view.name === "round" || view.name === "editRound") &&
     !app.loading &&
     !app.players.some((p) => p.id === view.playerId);
 
@@ -117,6 +122,7 @@ export default function App() {
         onFlight={() => navigate({ name: "flight" })}
         onTournament={() => navigate({ name: "tournaments" })}
         onRecover={app.recover}
+        onReorder={app.reorderPlayers}
       />
     );
   }
@@ -212,10 +218,33 @@ export default function App() {
         onStart={(hcp, distance) => navigate({ name: "round", playerId: player.id, hcp, distance })}
         onSetHcp={(hcp) => app.setCurrentHcp(player.id, hcp)}
         onShareAccess={() => app.shareLink(player.id)}
+        onEditRound={(roundId) => navigate({ name: "editRound", playerId: player.id, roundId })}
+        onDeleteRound={app.deleteRound}
         onDelete={async () => {
           await app.deletePlayer(player.id);
           navigate({ name: "players" });
         }}
+      />
+    );
+  }
+
+  if (view.name === "editRound") {
+    const r = app.rounds.find((x) => x.id === view.roundId);
+    if (!r) {
+      navigate({ name: "board", playerId: player.id });
+      return null;
+    }
+    return (
+      <Round
+        player={player}
+        initialHcp={r.hcp}
+        initialDistance={r.distance}
+        recordsByDistance={{}}
+        existing={r}
+        onSave={async (hcp, distance, holes) => {
+          await app.editRound(r.id, hcp, distance, holes);
+        }}
+        onBack={() => navigate({ name: "board", playerId: player.id })}
       />
     );
   }

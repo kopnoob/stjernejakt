@@ -21,6 +21,7 @@ const LS_ROUNDS = "sj.rounds";
 const LS_DELETIONS = "sj.deletions"; // string[] av skjulte spiller-id-er
 const LS_CURRENT_HCP = "sj.currentHcp"; // { [playerId]: hcp }
 const LS_PENDING = "sj.pendingSync"; // ids som ennå ikke er bekreftet pushet
+const LS_PENDING_UPD = "sj.pendingUpd"; // runde-ids med lokal endring (rediger/slett) ikke bekreftet
 const LS_VERSION = "sj.storeVersion";
 const STORE_VERSION = "2-multidevice";
 
@@ -61,6 +62,8 @@ export interface Store {
   savePlayer(p: Player): Promise<SaveResult>;
   deletePlayer(id: string): Promise<SaveResult>;
   saveRound(r: Round): Promise<SaveResult>;
+  /** Rediger eller myk-slett (deleted:true) en runde. */
+  updateRound(r: Round): Promise<SaveResult>;
 }
 
 // ─── localStorage-hjelpere ────────────────────────────────────────────────
@@ -116,6 +119,16 @@ export function setCurrentHcpLocal(playerId: string, hcp: number): void {
   writeObj(LS_CURRENT_HCP, map);
 }
 
+// ─── Spiller-rekkefølge (lokal enhets-preferanse) ─────────────────────────
+
+const LS_ORDER = "sj.playerOrder";
+export function getPlayerOrder(): string[] {
+  return readLS<string>(LS_ORDER);
+}
+export function setPlayerOrder(ids: string[]): void {
+  writeLS(LS_ORDER, ids);
+}
+
 // ─── Tombstones (lokal sletting) ──────────────────────────────────────────
 
 function readDeletions(): string[] {
@@ -135,7 +148,8 @@ class LocalStore implements Store {
   async load(): Promise<Snapshot> {
     const deleted = new Set(readDeletions());
     const players = readLS<Player>(LS_PLAYERS).filter((p) => !deleted.has(p.id));
-    const rounds = readLS<Round>(LS_ROUNDS).filter((r) => !deleted.has(r.player_id));
+    // Skjul myk-slettede runder (deleted-flagg) i visningen.
+    const rounds = readLS<Round>(LS_ROUNDS).filter((r) => !deleted.has(r.player_id) && !r.deleted);
     return { players, rounds, syncedRemote: false };
   }
 
@@ -155,6 +169,11 @@ class LocalStore implements Store {
     writeLS(LS_ROUNDS, upsertById(readLS<Round>(LS_ROUNDS), r));
     return { synced: false };
   }
+
+  async updateRound(r: Round): Promise<SaveResult> {
+    writeLS(LS_ROUNDS, upsertById(readLS<Round>(LS_ROUNDS), r));
+    return { synced: false };
+  }
 }
 
 // ─── SupabaseStore (insert-only + lokal cache) ────────────────────────────
@@ -169,6 +188,33 @@ function playerRow(p: Player) {
     owner: p.owner ?? cachedUid(),
     created_at: p.created_at,
   };
+}
+
+/** Felter som settes ved oppdatering av en runde (uten id). */
+function roundUpdateRow(r: Round) {
+  return {
+    player_id: r.player_id,
+    hcp: r.hcp,
+    distance: r.distance,
+    star: r.star,
+    holed_count: r.holed_count,
+    total_strokes: r.total_strokes,
+    holes: r.holes,
+    created_at: r.created_at,
+    deleted: r.deleted ?? false,
+  };
+}
+
+function addPendingUpd(id: string): void {
+  const set = new Set(readLS<string>(LS_PENDING_UPD));
+  set.add(id);
+  writeLS(LS_PENDING_UPD, [...set]);
+}
+function removePendingUpd(id: string): void {
+  writeLS(
+    LS_PENDING_UPD,
+    readLS<string>(LS_PENDING_UPD).filter((x) => x !== id),
+  );
 }
 
 class SupabaseStore implements Store {
@@ -193,16 +239,23 @@ class SupabaseStore implements Store {
 
       // Push opp lokalt-laget data som ikke finnes i remote (offline-kø).
       await this.pushMissing(remotePlayers, remoteRounds);
+      // Push ventende redigeringer/slettinger (og reflekter dem i remoteRounds).
+      await this.pushPendingUpdates(remoteRounds);
 
-      // Union: remote + lokale-bare-rader (begge er uforanderlige).
+      // Union: remote + lokale-bare-nye-rader.
       const merged = this.union(
         { players: remotePlayers, rounds: remoteRounds },
         await this.cache.load(),
       );
       writeLS(LS_PLAYERS, merged.players);
       writeLS(LS_ROUNDS, merged.rounds);
-      writeLS(LS_PENDING, []); // alt synket
-      return { ...merged, syncedRemote: true };
+      writeLS(LS_PENDING, []);
+      // Skjul myk-slettede runder i visningen (men behold dem i cachen).
+      return {
+        players: merged.players,
+        rounds: merged.rounds.filter((r) => !r.deleted),
+        syncedRemote: true,
+      };
     } catch (e) {
       logSync("load feilet, bruker cache", e);
       return local; // syncedRemote: false
@@ -217,6 +270,55 @@ class SupabaseStore implements Store {
   async saveRound(r: Round): Promise<SaveResult> {
     await this.cache.saveRound(r);
     return this.tryInsert("rounds", r, r.id);
+  }
+
+  async updateRound(r: Round): Promise<SaveResult> {
+    await this.cache.updateRound(r);
+    const sb = await getSupabase();
+    if (!sb) {
+      addPendingUpd(r.id);
+      return { synced: false };
+    }
+    await ensureAuth();
+    try {
+      const { error } = await sb.from("rounds").update(roundUpdateRow(r)).eq("id", r.id);
+      if (error) throw error;
+      removePendingUpd(r.id);
+      return { synced: true };
+    } catch (e) {
+      addPendingUpd(r.id);
+      logSync("oppdater runde feilet (synkes senere)", e);
+      return { synced: false };
+    }
+  }
+
+  /** Synk ventende redigeringer/slettinger; reflekter dem i remoteRounds. */
+  private async pushPendingUpdates(remoteRounds: Round[]): Promise<void> {
+    const pending = readLS<string>(LS_PENDING_UPD);
+    if (!pending.length) return;
+    const localRounds = readLS<Round>(LS_ROUNDS);
+    const sb = await getSupabase();
+    const stillPending: string[] = [];
+    for (const id of pending) {
+      const r = localRounds.find((x) => x.id === id);
+      if (!r) continue;
+      // Reflekter lokal endring i remoteRounds så union/visning blir riktig.
+      const idx = remoteRounds.findIndex((x) => x.id === id);
+      if (idx >= 0) remoteRounds[idx] = r;
+      else remoteRounds.push(r);
+      let ok = false;
+      if (sb) {
+        try {
+          const { error } = await sb.from("rounds").update(roundUpdateRow(r)).eq("id", r.id);
+          ok = !error;
+          if (error) logSync("ventende runde-oppdatering feilet", error);
+        } catch (e) {
+          logSync("ventende runde-oppdatering feilet", e);
+        }
+      }
+      if (!ok) stillPending.push(id);
+    }
+    writeLS(LS_PENDING_UPD, stillPending);
   }
 
   async deletePlayer(id: string): Promise<SaveResult> {

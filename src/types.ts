@@ -43,6 +43,8 @@ export interface Round {
   total_strokes: number;
   holes: HoleResult[];
   created_at: string;
+  /** Myk sletting — skjules i appen, men raden består (tombstone). */
+  deleted?: boolean;
 }
 
 /** Én celle i stjerne-matrisen (hcp × avstand). */

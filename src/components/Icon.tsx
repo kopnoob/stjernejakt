@@ -1,5 +1,5 @@
 interface Props {
-  name: "back" | "more" | "share" | "flight" | "trophy" | "user";
+  name: "back" | "more" | "share" | "flight" | "trophy" | "user" | "up" | "down";
   size?: number;
 }
 
@@ -27,6 +27,8 @@ export default function Icon({ name, size = 24 }: Props) {
       aria-hidden="true"
     >
       {name === "back" && <path d="M15 5l-7 7 7 7" />}
+      {name === "up" && <path d="M5 15l7-7 7 7" />}
+      {name === "down" && <path d="M5 9l7 7 7-7" />}
       {name === "share" && (
         <>
           <path d="M12 3v12" />

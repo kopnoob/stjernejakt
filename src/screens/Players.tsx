@@ -19,9 +19,11 @@ interface Props {
   onFlight: () => void;
   onTournament: () => void;
   onRecover: (code: string) => Promise<number>;
+  onReorder: (ids: string[]) => void;
 }
 
-export default function Players({ players, rounds, backend, syncState, getHcp, onOpen, onAdd, onFlight, onTournament, onRecover }: Props) {
+export default function Players({ players, rounds, backend, syncState, getHcp, onOpen, onAdd, onFlight, onTournament, onRecover, onReorder }: Props) {
+  const [sorting, setSorting] = useState(false);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [color, setColor] = useState(PLAYER_COLORS[0]);
@@ -65,6 +67,14 @@ export default function Players({ players, rounds, backend, syncState, getHcp, o
     onOpen(p.id);
   }
 
+  function move(i: number, delta: number) {
+    const j = i + delta;
+    if (j < 0 || j >= players.length) return;
+    const ids = players.map((p) => p.id);
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    onReorder(ids);
+  }
+
   return (
     <div className="screen">
       <header className="home-hero">
@@ -102,25 +112,54 @@ export default function Players({ players, rounds, backend, syncState, getHcp, o
           </div>
         )}
 
-        {players.map((p) => (
-          <button key={p.id} className="player-card" onClick={() => onOpen(p.id)}>
-            <span className="avatar" style={{ background: p.color }}>
-              {p.avatar ? p.avatar : p.name.charAt(0).toUpperCase()}
-            </span>
-            <span className="player-card-info">
-              <span className="player-card-name">{p.name}</span>
-              <span className="player-card-sub muted">
-                Handicap {progByPlayer.get(p.id)?.hcp ?? 5}
+        {players.map((p, i) =>
+          sorting ? (
+            <div key={p.id} className="player-card player-card-sorting">
+              <span className="avatar" style={{ background: p.color }}>
+                {p.avatar ? p.avatar : p.name.charAt(0).toUpperCase()}
               </span>
-            </span>
-            <span className="player-card-stars tabnum">
-              {progByPlayer.get(p.id)?.gold ?? 0}/7
-              <StarIcon variant="gold" size={18} />
-            </span>
-          </button>
-        ))}
+              <span className="player-card-info">
+                <span className="player-card-name">{p.name}</span>
+              </span>
+              <span className="reorder-btns">
+                <button
+                  className="reorder-btn"
+                  onClick={() => move(i, -1)}
+                  disabled={i === 0}
+                  aria-label={`Flytt ${p.name} opp`}
+                >
+                  <Icon name="up" size={20} />
+                </button>
+                <button
+                  className="reorder-btn"
+                  onClick={() => move(i, 1)}
+                  disabled={i === players.length - 1}
+                  aria-label={`Flytt ${p.name} ned`}
+                >
+                  <Icon name="down" size={20} />
+                </button>
+              </span>
+            </div>
+          ) : (
+            <button key={p.id} className="player-card" onClick={() => onOpen(p.id)}>
+              <span className="avatar" style={{ background: p.color }}>
+                {p.avatar ? p.avatar : p.name.charAt(0).toUpperCase()}
+              </span>
+              <span className="player-card-info">
+                <span className="player-card-name">{p.name}</span>
+                <span className="player-card-sub muted">
+                  Handicap {progByPlayer.get(p.id)?.hcp ?? 5}
+                </span>
+              </span>
+              <span className="player-card-stars tabnum">
+                {progByPlayer.get(p.id)?.gold ?? 0}/7
+                <StarIcon variant="gold" size={18} />
+              </span>
+            </button>
+          ),
+        )}
 
-        {adding ? (
+        {!sorting && adding ? (
           <div className="add-form">
             <div className="add-preview">
               <span className="avatar avatar-lg" style={{ background: color }}>
@@ -171,23 +210,32 @@ export default function Players({ players, rounds, backend, syncState, getHcp, o
               </button>
             </div>
           </div>
+        ) : sorting ? (
+          <button className="btn btn-primary" onClick={() => setSorting(false)}>
+            Ferdig
+          </button>
         ) : (
           <button className="btn btn-add" onClick={openAdd}>
             + Ny spiller
           </button>
         )}
 
-        {players.length >= 2 && !adding && (
-          <div className="entry-row">
-            <button className="btn btn-flight" onClick={onFlight}>
-              <Icon name="flight" size={20} />
-              Følg en flight
+        {!sorting && players.length >= 2 && !adding && (
+          <>
+            <div className="entry-row">
+              <button className="btn btn-flight" onClick={onFlight}>
+                <Icon name="flight" size={20} />
+                Følg en flight
+              </button>
+              <button className="btn btn-flight" onClick={onTournament}>
+                <Icon name="trophy" size={20} />
+                Turnering
+              </button>
+            </div>
+            <button className="btn-textlink" onClick={() => setSorting(true)}>
+              Endre rekkefølge
             </button>
-            <button className="btn btn-flight" onClick={onTournament}>
-              <Icon name="trophy" size={20} />
-              Turnering
-            </button>
-          </div>
+          </>
         )}
       </div>
 
@@ -207,6 +255,7 @@ export default function Players({ players, rounds, backend, syncState, getHcp, o
         <ProfileModal
           recoveryCode={getRecoveryCode()}
           firstRun={firstRun}
+          localPlayerCount={players.length}
           onRecover={onRecover}
           onClose={() => setProfileOpen(false)}
         />

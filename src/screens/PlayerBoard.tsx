@@ -16,11 +16,13 @@ interface Props {
   onSetHcp: (hcp: number) => void;
   onDelete: () => void;
   onShareAccess: () => Promise<string | null>;
+  onEditRound: (roundId: string) => void;
+  onDeleteRound: (roundId: string) => Promise<void>;
 }
 
 type Mode = "journey" | "overview" | "history";
 
-export default function PlayerBoard({ player, rounds, currentHcp, onBack, onStart, onSetHcp, onDelete, onShareAccess }: Props) {
+export default function PlayerBoard({ player, rounds, currentHcp, onBack, onStart, onSetHcp, onDelete, onShareAccess, onEditRound, onDeleteRound }: Props) {
   const [mode, setMode] = useState<Mode>("journey");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [switchHcp, setSwitchHcp] = useState(false);
@@ -197,7 +199,9 @@ export default function PlayerBoard({ player, rounds, currentHcp, onBack, onStar
       {mode === "overview" && (
         <OverviewGrid playerRounds={playerRounds} currentHcp={hcp} onStart={onStart} />
       )}
-      {mode === "history" && <History rounds={playerRounds} />}
+      {mode === "history" && (
+        <History rounds={playerRounds} onEdit={onEditRound} onDelete={onDeleteRound} />
+      )}
 
       {/* C1: del diplom */}
       <button className="btn btn-ghost btn-share" onClick={shareDiplomaNow} disabled={sharing}>
@@ -428,7 +432,18 @@ function OverviewGrid({
 
 // ─── Historikk: tidslinje av runder (C3) ───────────────────────────────────
 
-function History({ rounds }: { rounds: Round[] }) {
+function History({
+  rounds,
+  onEdit,
+  onDelete,
+}: {
+  rounds: Round[];
+  onEdit: (id: string) => void;
+  onDelete: (id: string) => Promise<void>;
+}) {
+  const [sheet, setSheet] = useState<Round | null>(null);
+  const [confirm, setConfirm] = useState<Round | null>(null);
+
   // Nyeste først.
   const sorted = useMemo(
     () => [...rounds].sort((a, b) => b.created_at.localeCompare(a.created_at)),
@@ -459,7 +474,12 @@ function History({ rounds }: { rounds: Round[] }) {
         <div key={g.day} className="history-group">
           <div className="history-day muted">{g.day}</div>
           {g.items.map((r) => (
-            <div key={r.id} className="history-row">
+            <button
+              key={r.id}
+              className="history-row history-row-btn"
+              onClick={() => setSheet(r)}
+              aria-label={`Rediger eller slett: ${r.distance} m`}
+            >
               <span className="history-cone" style={{ background: DISTANCE_COLOR[r.distance] }} />
               <span className="history-dist">{r.distance} m</span>
               <span className="history-hcp muted">hcp {r.hcp}</span>
@@ -473,10 +493,71 @@ function History({ rounds }: { rounds: Round[] }) {
                   <StarIcon variant={r.star} size={22} outline={false} />
                 )}
               </span>
-            </div>
+              <span className="history-more" aria-hidden="true">
+                <Icon name="more" size={16} />
+              </span>
+            </button>
           ))}
         </div>
       ))}
+
+      {sheet && (
+        <Modal onClose={() => setSheet(null)} labelledBy="hist-title">
+          <p className="sheet-title" id="hist-title">
+            {sheet.distance} m · {starLabel(sheet.star)}
+          </p>
+          <p className="muted">
+            {formatDay(sheet.created_at)} · {sheet.holed_count}/3 i mål · {sheet.total_strokes} slag
+          </p>
+          <div className="menu-actions">
+            <button
+              className="btn btn-ghost menu-action"
+              onClick={() => {
+                const s = sheet;
+                setSheet(null);
+                onEdit(s.id);
+              }}
+            >
+              Rediger sesjon
+            </button>
+            <button
+              className="btn btn-ghost menu-action menu-danger"
+              onClick={() => {
+                setConfirm(sheet);
+                setSheet(null);
+              }}
+            >
+              Slett sesjon
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {confirm && (
+        <Modal onClose={() => setConfirm(null)} labelledBy="histdel-title">
+          <p className="sheet-title" id="histdel-title">
+            Slette sesjonen?
+          </p>
+          <p className="muted">
+            {confirm.distance} m · {formatDay(confirm.created_at)} forsvinner fra historikken.
+          </p>
+          <div className="add-actions">
+            <button className="btn btn-ghost" onClick={() => setConfirm(null)}>
+              Avbryt
+            </button>
+            <button
+              className="btn btn-danger"
+              onClick={() => {
+                const c = confirm;
+                setConfirm(null);
+                void onDelete(c.id);
+              }}
+            >
+              Slett
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

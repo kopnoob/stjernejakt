@@ -12,6 +12,10 @@ import "./App.css";
 import App from "./App.tsx";
 import ErrorBoundary from "./components/ErrorBoundary.tsx";
 import { registerPwa } from "./lib/pwa";
+import { ensureLocalRecoveryCode } from "./lib/supabase";
+
+// Lag gjenopprettingskoden lokalt før første render (vises én gang).
+ensureLocalRecoveryCode();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

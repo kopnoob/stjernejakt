@@ -3,7 +3,7 @@ import StarIcon from "../components/StarIcon";
 import Icon from "../components/Icon";
 import ResultOverlay from "../components/ResultOverlay";
 import { evaluateRound } from "../rules";
-import type { HoleResult, Player } from "../types";
+import type { HoleResult, Player, Round as RoundType } from "../types";
 import { DISTANCES, DISTANCE_COLOR, HOLES_PER_ROUND } from "../types";
 
 interface Props {
@@ -12,6 +12,8 @@ interface Props {
   initialDistance: number;
   /** Beste gull-score (færrest slag) pr utslag på dette hcp FØR runden — for A4-rekord. */
   recordsByDistance: Record<number, number | null>;
+  /** Hvis satt: rediger en eksisterende runde (forhåndsfyll, ingen feiring). */
+  existing?: RoundType;
   onSave: (hcp: number, distance: number, holes: HoleResult[]) => Promise<void>;
   onBack: () => void;
 }
@@ -28,9 +30,11 @@ export default function Round({
   initialHcp,
   initialDistance,
   recordsByDistance,
+  existing,
   onSave,
   onBack,
 }: Props) {
+  const isEdit = !!existing;
   // Hcp er fast for runden (valgt på boardet før start) — flyten er ledende,
   // så vi redigerer ikke hcp midt i runden.
   const hcp = initialHcp;
@@ -41,8 +45,10 @@ export default function Round({
   // verdien én gang (settes aldri på nytt).
   const [priorRecords] = useState(() => recordsByDistance);
   // Slagene beholdes hvis man bytter utslag — man retter ofte opp en feil
-  // eller ombestemmer seg midt i runden.
-  const [holes, setHoles] = useState<HoleResult[]>(freshHoles);
+  // eller ombestemmer seg midt i runden. Ved redigering: forhåndsfyll.
+  const [holes, setHoles] = useState<HoleResult[]>(() =>
+    existing ? existing.holes.map((h) => ({ ...h })) : freshHoles(),
+  );
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -92,6 +98,10 @@ export default function Round({
     setSaving(true);
     try {
       await onSave(hcp, distance, holes);
+      if (isEdit) {
+        onBack(); // redigering: ingen feiring, rett tilbake til historikken
+        return;
+      }
       setSaved(true); // viser feiringen først når lagring er fullført
     } finally {
       setSaving(false);
@@ -109,7 +119,7 @@ export default function Round({
             <span className="dot" style={{ background: player.color }} />
             {player.name}
           </span>
-          <span className="topbar-hcp">Handicap {hcp}</span>
+          <span className="topbar-hcp">{isEdit ? "Rediger · " : ""}Handicap {hcp}</span>
         </span>
         <span className="round-prog tabnum" aria-label="Hull spilt">
           {setHolesList.length}/{HOLES_PER_ROUND}
