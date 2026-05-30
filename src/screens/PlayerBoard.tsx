@@ -3,7 +3,7 @@ import StarIcon from "../components/StarIcon";
 import Icon from "../components/Icon";
 import Modal from "../components/Modal";
 import RulesModal from "../components/RulesModal";
-import { buildMatrix, hcpProgress, nextHcpDown } from "../rules";
+import { hcpProgress, nextHcpDown } from "../rules";
 import type { Player, Round, Star } from "../types";
 import { DISTANCES, DISTANCE_COLOR, HCP_RANGE, MAX_STARS_PER_HCP } from "../types";
 import { buildDiploma, shareDiploma } from "../lib/diploma";
@@ -247,7 +247,14 @@ export default function PlayerBoard({ player, rounds, currentHcp, onBack, onStar
         />
       )}
       {mode === "overview" && (
-        <OverviewGrid playerRounds={playerRounds} currentHcp={hcp} onStart={onStart} />
+        <MasteryLadder
+          playerRounds={playerRounds}
+          currentHcp={hcp}
+          onPick={(h) => {
+            onSetHcp(h);
+            setMode("journey");
+          }}
+        />
       )}
       {mode === "history" && (
         <History rounds={playerRounds} onEdit={onEditRound} onDelete={onDeleteRound} />
@@ -459,60 +466,87 @@ function Journey({
   );
 }
 
-// ─── Oversikt: full matrise (sekundær) ─────────────────────────────────────
+// ─── Oversikt: mestrings-stige (kun handicap man har rørt) ─────────────────
+// Erstatter den gamle 7×7-matrisen. Viser bare relevante handicap — fullførte,
+// det man er på nå, og én låst «neste hardere» som teaser — som en stige man
+// klatrer. Tapp et nivå for å åpne reisen på det handicapet.
 
-function OverviewGrid({
+function MasteryLadder({
   playerRounds,
   currentHcp,
-  onStart,
+  onPick,
 }: {
   playerRounds: Round[];
   currentHcp: number;
-  onStart: (hcp: number, distance: number) => void;
+  onPick: (hcp: number) => void;
 }) {
-  const matrix = useMemo(() => buildMatrix(playerRounds), [playerRounds]);
+  const rows = useMemo(() => {
+    const attempted = new Set<number>(playerRounds.map((r) => r.hcp));
+    attempted.add(currentHcp);
+    // Lettest → hardest (synkende tall), slik reisen går nedover i handicap.
+    const shown = HCP_RANGE.filter((h) => attempted.has(h)).sort((a, b) => b - a);
+    const out: { hcp: number; prog: ReturnType<typeof hcpProgress> | null; locked: boolean }[] =
+      shown.map((h) => ({ hcp: h, prog: hcpProgress(playerRounds, h), locked: false }));
+    // Én låst, motiverende «neste hardere» nederst (hvis den finnes og er urørt).
+    const hardest = shown.length ? Math.min(...shown) : currentHcp;
+    const next = nextHcpDown(hardest);
+    if (next != null && !attempted.has(next)) out.push({ hcp: next, prog: null, locked: true });
+    return out;
+  }, [playerRounds, currentHcp]);
+
   return (
-    <div className="matrix-wrap">
-      <table className="matrix">
-        <thead>
-          <tr>
-            <th className="corner" />
-            {HCP_RANGE.map((h) => (
-              <th key={h} className={h === currentHcp ? "hcp-current" : ""}>
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {DISTANCES.map((d) => (
-            <tr key={d}>
-              <th className="dist-label">
-                <span className="cone" style={{ background: DISTANCE_COLOR[d] }} />
-                {d}
-              </th>
-              {HCP_RANGE.map((h) => {
-                const best: Star = matrix.get(`${h}:${d}`)?.best ?? "none";
-                return (
-                  <td key={h}>
-                    <button
-                      className={`cell star-${best}`}
-                      onClick={() => onStart(h, d)}
-                      aria-label={`Hcp ${h}, ${d} meter${best !== "none" ? `, beste: ${best}` : ""}`}
-                    >
-                      {best === "none" ? (
-                        <span className="cell-dash">·</span>
-                      ) : (
-                        <StarIcon variant={best} size={18} outline={false} />
-                      )}
-                    </button>
-                  </td>
+    <div className="ladder">
+      {rows.map((row) =>
+        row.locked || !row.prog ? (
+          <div key={row.hcp} className="ladder-row is-locked">
+            <span className="ladder-hcp">
+              <span className="ladder-lock" aria-hidden="true">
+                🔒
+              </span>
+              Handicap {row.hcp}
+            </span>
+            <span className="ladder-locktext muted">
+              Fullfør handicap {row.hcp + 1} for å låse opp
+            </span>
+          </div>
+        ) : (
+          <button
+            key={row.hcp}
+            className={`ladder-row ${row.hcp === currentHcp ? "is-current" : ""} ${
+              row.prog.completed ? "is-done" : ""
+            }`}
+            onClick={() => onPick(row.hcp)}
+            aria-label={`Handicap ${row.hcp}, ${row.prog.goldCount} av 7 gull${
+              row.prog.completed ? ", fullført" : ""
+            }${row.hcp === currentHcp ? ", du er her" : ""}`}
+          >
+            <span className="ladder-hcp">
+              {row.prog.completed && (
+                <span className="ladder-trophy" aria-hidden="true">
+                  🏆
+                </span>
+              )}
+              Handicap {row.hcp}
+            </span>
+            <span className="ladder-stars" aria-hidden="true">
+              {DISTANCES.map((d) => {
+                const s: Star = row.prog!.bestStarByDistance[d] ?? "none";
+                return s === "none" ? (
+                  <span key={d} className="ladder-dot">
+                    ·
+                  </span>
+                ) : (
+                  <StarIcon key={d} variant={s} size={14} outline={false} />
                 );
               })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+            </span>
+            <span className="ladder-meta">
+              {row.hcp === currentHcp && <span className="ladder-here">du er her</span>}
+              <span className="ladder-count tabnum">{row.prog.goldCount}/7</span>
+            </span>
+          </button>
+        ),
+      )}
     </div>
   );
 }

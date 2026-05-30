@@ -802,71 +802,91 @@
   margin-left: 2px;
 }
 
-.matrix-wrap {
+/* Mestrings-stige: ett kort per relevant handicap (fullført / nåværende /
+   låst teaser). Tapp for å åpne reisen på det nivået. */
+.ladder {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ladder-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
   background: var(--card);
   border-radius: var(--r);
-  box-shadow: var(--shadow);
-  padding: 10px 8px;
-}
-.matrix {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
-.matrix th {
-  font-family: var(--display);
-  font-weight: 600;
-  font-size: 13px;
-  color: var(--ink-2);
-  padding: 4px 0;
-  text-align: center;
-}
-.matrix .corner { width: 38px; }
-.matrix th.hcp-current {
-  color: var(--green);
-}
-.matrix th.hcp-current::after {
-  content: "";
-  display: block;
-  width: 16px;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--green);
-  margin: 2px auto 0;
-}
-.dist-label {
-  display: flex !important;
-  align-items: center;
-  gap: 4px;
-  justify-content: flex-start !important;
-  font-size: 12.5px !important;
-  color: var(--ink) !important;
-  white-space: nowrap;
-}
-.cone {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 0, 0, 0.18);
-  flex-shrink: 0;
-}
-.matrix td {
-  padding: 3px;
-  text-align: center;
-}
-.cell {
-  width: 100%;
-  aspect-ratio: 1;
-  border-radius: 11px;
-  display: grid;
-  place-items: center;
-  background: var(--card-sunken);
+  box-shadow: var(--shadow-sm);
+  padding: 12px 14px;
+  border: 2px solid transparent;
   transition: transform 0.1s ease;
 }
-.cell:active { transform: scale(0.9); }
-.cell.star-bronze { background: var(--bronze-tint); }
-.cell.star-silver { background: var(--silver-tint); }
-.cell.star-gold { background: var(--gold-tint); }
+.ladder-row:active { transform: scale(0.99); }
+.ladder-row.is-current {
+  border-color: var(--green);
+  box-shadow: 0 6px 18px rgba(31, 107, 67, 0.18);
+}
+.ladder-row.is-done { background: var(--gold-tint); }
+.ladder-hcp {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  min-width: 92px;
+}
+.ladder-trophy,
+.ladder-lock { font-size: 15px; }
+.ladder-stars {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+.ladder-dot {
+  color: var(--ink-3);
+  font-size: 13px;
+  width: 14px;
+  text-align: center;
+}
+.ladder-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.ladder-here {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #fff;
+  background: var(--green);
+  padding: 2px 6px;
+  border-radius: var(--r-pill);
+}
+.ladder-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+  min-width: 26px;
+  text-align: right;
+}
+.ladder-row.is-done .ladder-count { color: #8a5a00; }
+.ladder-row.is-locked {
+  background: transparent;
+  box-shadow: none;
+  border: 2px dashed var(--line);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.ladder-row.is-locked .ladder-hcp { color: var(--ink-2); }
+.ladder-locktext { font-size: 12px; }
 .cell-dash { color: var(--ink-3); font-size: 16px; }
 
 /* ─── Runde: oppsett ────────────────────────────────────── */
