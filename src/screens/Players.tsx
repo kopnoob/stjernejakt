@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import StarIcon from "../components/StarIcon";
 import Icon from "../components/Icon";
 import ProfileModal from "../components/ProfileModal";
+import RulesModal from "../components/RulesModal";
 import { hcpProgress } from "../rules";
 import type { Player, Round } from "../types";
 import { PLAYER_AVATARS, PLAYER_COLORS } from "../types";
@@ -32,6 +33,7 @@ export default function Players({ players, rounds, backend, syncState, getHcp, o
   // Initialiseres fra localStorage ved første render (ingen setState i effekt).
   const [profileOpen, setProfileOpen] = useState<boolean>(() => recoveryIsNew());
   const [firstRun, setFirstRun] = useState<boolean>(() => recoveryIsNew());
+  const [rulesOpen, setRulesOpen] = useState(false);
 
   useEffect(() => {
     if (recoveryIsNew()) clearRecoveryNew();
@@ -79,6 +81,13 @@ export default function Players({ players, rounds, backend, syncState, getHcp, o
     <div className="screen">
       <header className="home-hero">
         <button
+          className="icon-btn rules-btn"
+          onClick={() => setRulesOpen(true)}
+          aria-label="Slik fungerer Stjernejakt"
+        >
+          <Icon name="info" size={22} />
+        </button>
+        <button
           className="icon-btn profile-btn"
           onClick={() => {
             setFirstRun(false);
@@ -109,6 +118,9 @@ export default function Players({ players, rounds, backend, syncState, getHcp, o
             <p className="muted">
               Legg til barna og start jakten på bronse, sølv og gull – ett utslag av gangen.
             </p>
+            <button className="btn-textlink" onClick={() => setRulesOpen(true)}>
+              Les reglene
+            </button>
           </div>
         )}
 
@@ -260,6 +272,8 @@ export default function Players({ players, rounds, backend, syncState, getHcp, o
           onClose={() => setProfileOpen(false)}
         />
       )}
+
+      {rulesOpen && <RulesModal onClose={() => setRulesOpen(false)} />}
     </div>
   );
 }

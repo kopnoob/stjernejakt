@@ -1449,6 +1449,43 @@
   top: 0;
   right: 0;
 }
+.rules-btn {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* ─── Regel-oversikt ────────────────────────────────────── */
+.rules-sheet {
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.rules-block {
+  display: flex;
+  gap: 12px;
+  margin: 14px 0;
+}
+.rules-block strong {
+  font-family: var(--display);
+  font-size: 16px;
+}
+.rules-block p { margin: 4px 0 0; font-size: 14px; line-height: 1.5; }
+.rules-emoji { font-size: 24px; flex-shrink: 0; line-height: 1.2; }
+.rules-stars {
+  list-style: none;
+  margin: 8px 0 4px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rules-stars li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
 .recovery-code {
   background: var(--card-sunken);
   border: 2px dashed var(--gold-soft);
