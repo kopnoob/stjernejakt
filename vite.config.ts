@@ -4,8 +4,17 @@ import { VitePWA } from "vite-plugin-pwa";
 
 // GitHub Pages serves project sites under /<repo>/, så base må matche
 // repo-navnet ved build. Lokalt brukes "/".
-// Bygge-stempel så brukeren kan se hvilken versjon enheten faktisk kjører.
-const BUILD_ID = new Date().toISOString().slice(0, 16).replace("T", " ");
+// Bygge-stempel (norsk tid) så brukeren kan se hvilken versjon enheten kjører.
+// sv-SE gir ISO-lignende format «ÅÅÅÅ-MM-DD TT:MM»; Europe/Oslo håndterer
+// sommertid automatisk.
+const BUILD_ID = new Date().toLocaleString("sv-SE", {
+  timeZone: "Europe/Oslo",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+});
 
 export default defineConfig(({ command }) => ({
   base: command === "build" ? "/stjernejakt/" : "/",
