@@ -15,7 +15,7 @@ type View =
   | { name: "board"; playerId: string }
   | { name: "round"; playerId: string; hcp: number; distance: number }
   | { name: "flight" }
-  | { name: "flightRound"; distance: number; playerIds: string[] }
+  | { name: "flightRound"; playerIds: string[] }
   | { name: "tournaments" }
   | { name: "tournament"; id: string };
 
@@ -36,8 +36,8 @@ function parseHash(): View {
     return { name: "tournaments" };
   }
   if (parts[0] === "flight") {
-    if (parts[1] === "r" && parts[2] && parts[3]) {
-      return { name: "flightRound", distance: Number(parts[2]), playerIds: parts[3].split(",").filter(Boolean) };
+    if (parts[1] === "r" && parts[2]) {
+      return { name: "flightRound", playerIds: parts[2].split(",").filter(Boolean) };
     }
     return { name: "flight" };
   }
@@ -54,7 +54,7 @@ function toHash(v: View): string {
   if (v.name === "board") return `#/p/${v.playerId}`;
   if (v.name === "round") return `#/p/${v.playerId}/r/${v.hcp}/${v.distance}`;
   if (v.name === "flight") return "#/flight";
-  if (v.name === "flightRound") return `#/flight/r/${v.distance}/${v.playerIds.join(",")}`;
+  if (v.name === "flightRound") return `#/flight/r/${v.playerIds.join(",")}`;
   if (v.name === "tournaments") return "#/turnering";
   if (v.name === "tournament") return `#/turnering/${v.id}`;
   return "#/";
@@ -140,7 +140,7 @@ export default function App() {
         players={app.players}
         getHcp={app.getHcp}
         onBack={() => navigate({ name: "players" })}
-        onStart={(distance, playerIds) => navigate({ name: "flightRound", distance, playerIds })}
+        onStart={(playerIds) => navigate({ name: "flightRound", playerIds })}
       />
     );
   }
@@ -156,14 +156,21 @@ export default function App() {
           players={app.players}
           getHcp={app.getHcp}
           onBack={() => navigate({ name: "players" })}
-          onStart={(distance, playerIds) => navigate({ name: "flightRound", distance, playerIds })}
+          onStart={(playerIds) => navigate({ name: "flightRound", playerIds })}
         />
       );
+    }
+    // Forhåndsvalgt utslag pr spiller = det de jobber med i reisen (laveste
+    // utslag uten gull på sitt nåværende handicap).
+    const suggestedDistance: Record<string, number> = {};
+    for (const p of flightPlayers) {
+      const pr = app.rounds.filter((r) => r.player_id === p.id);
+      suggestedDistance[p.id] = hcpProgress(pr, app.getHcp(p.id)).nextDistance ?? 30;
     }
     return (
       <FlightRound
         players={flightPlayers}
-        initialDistance={view.distance}
+        suggestedDistance={suggestedDistance}
         getHcp={app.getHcp}
         onSaveAll={app.addRounds}
         onBack={() => navigate({ name: "players" })}

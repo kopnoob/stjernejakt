@@ -8,7 +8,8 @@ import { DISTANCES, DISTANCE_COLOR } from "../types";
 
 interface Props {
   players: Player[];
-  initialDistance: number;
+  /** Forhåndsvalgt utslag pr spiller (det de jobber med i reisen). */
+  suggestedDistance: Record<string, number>;
   getHcp: (playerId: string) => number;
   onSaveAll: (
     entries: { playerId: string; hcp: number; distance: number; holes: HoleResult[] }[],
@@ -26,15 +27,19 @@ const freshHoles = (): HoleResult[] => [
 export interface FlightOutcome {
   player: Player;
   hcp: number;
+  distance: number;
   result: RoundResult;
 }
 
-/** Flerspillerscoring: logg hele flighten på samme utslag, lagre alt på én gang. */
-export default function FlightRound({ players, initialDistance, getHcp, onSaveAll, onBack }: Props) {
-  const [distance, setDistance] = useState(initialDistance);
-  // Hcp er fast for flighten (hver spillers nåværende nivå ved oppstart).
+/** Flerspillerscoring: hver spiller på sitt eget utslag, lagre alt på én gang. */
+export default function FlightRound({ players, suggestedDistance, getHcp, onSaveAll, onBack }: Props) {
+  // Hcp + utslag er per spiller. Hcp er fast (nivået ved oppstart); utslag kan
+  // endres per spiller siden barna ofte står på ulike utslag i samme flight.
   const [hcps] = useState<Record<string, number>>(() =>
     Object.fromEntries(players.map((p) => [p.id, getHcp(p.id)])),
+  );
+  const [distanceBy, setDistanceBy] = useState<Record<string, number>>(() =>
+    Object.fromEntries(players.map((p) => [p.id, suggestedDistance[p.id] ?? 30])),
   );
   const [holesBy, setHolesBy] = useState<Record<string, HoleResult[]>>(() =>
     Object.fromEntries(players.map((p) => [p.id, freshHoles()])),
@@ -57,6 +62,9 @@ export default function FlightRound({ players, initialDistance, getHcp, onSaveAl
       return { ...prev, [playerId]: holes };
     });
   }
+  function setDistance(playerId: string, d: number) {
+    setDistanceBy((prev) => ({ ...prev, [playerId]: d }));
+  }
 
   const isReady = (holes: HoleResult[]) => holes.every((h) => h.pickedUp || h.strokes > 0);
   const readyCount = players.filter((p) => isReady(holesBy[p.id])).length;
@@ -69,7 +77,7 @@ export default function FlightRound({ players, initialDistance, getHcp, onSaveAl
       const entries = players.map((p) => ({
         playerId: p.id,
         hcp: hcps[p.id],
-        distance,
+        distance: distanceBy[p.id],
         holes: holesBy[p.id],
       }));
       await onSaveAll(entries);
@@ -77,7 +85,8 @@ export default function FlightRound({ players, initialDistance, getHcp, onSaveAl
         players.map((p) => ({
           player: p,
           hcp: hcps[p.id],
-          result: evaluateRound(holesBy[p.id], hcps[p.id], distance),
+          distance: distanceBy[p.id],
+          result: evaluateRound(holesBy[p.id], hcps[p.id], distanceBy[p.id]),
         })),
       );
     } finally {
@@ -92,31 +101,12 @@ export default function FlightRound({ players, initialDistance, getHcp, onSaveAl
           <Icon name="back" size={22} />
         </button>
         <span className="topbar-title">
-          <Icon name="flight" size={20} /> Flight · {distance} m
+          <Icon name="flight" size={20} /> Flight
         </span>
         <span className="round-prog tabnum" aria-label="Spillere klare">
           {readyCount}/{players.length}
         </span>
       </header>
-
-      {/* Felles utslag for hele flighten */}
-      <section className="setup">
-        <div className="setup-group">
-          <span className="setup-label">Utslag (m)</span>
-          <div className="chip-row">
-            {DISTANCES.map((v) => (
-              <button
-                key={v}
-                className={`chip chip-dist ${distance === v ? "is-active" : ""}`}
-                onClick={() => setDistance(v)}
-              >
-                <span className="cone-sm" style={{ background: DISTANCE_COLOR[v] }} />
-                {v}
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
 
       <div className="flight-cards">
         {players.map((p) => (
@@ -124,8 +114,9 @@ export default function FlightRound({ players, initialDistance, getHcp, onSaveAl
             key={p.id}
             player={p}
             hcp={hcps[p.id]}
-            distance={distance}
+            distance={distanceBy[p.id]}
             holes={holesBy[p.id]}
+            onSetDistance={(d) => setDistance(p.id, d)}
             onBump={(i, d) => bump(p.id, i, d)}
             onTogglePickup={(i) => togglePickup(p.id, i)}
           />
@@ -141,7 +132,7 @@ export default function FlightRound({ players, initialDistance, getHcp, onSaveAl
         </button>
       </div>
 
-      {outcomes && <FlightResultOverlay outcomes={outcomes} distance={distance} onDone={onBack} />}
+      {outcomes && <FlightResultOverlay outcomes={outcomes} onDone={onBack} />}
     </div>
   );
 }
@@ -151,6 +142,7 @@ function PlayerScoreCard({
   hcp,
   distance,
   holes,
+  onSetDistance,
   onBump,
   onTogglePickup,
 }: {
@@ -158,6 +150,7 @@ function PlayerScoreCard({
   hcp: number;
   distance: number;
   holes: HoleResult[];
+  onSetDistance: (d: number) => void;
   onBump: (i: number, delta: number) => void;
   onTogglePickup: (i: number) => void;
 }) {
@@ -189,6 +182,21 @@ function PlayerScoreCard({
             </span>
           )}
         </span>
+      </div>
+
+      {/* Utslag pr spiller */}
+      <div className="chip-row flight-card-chips">
+        {DISTANCES.map((v) => (
+          <button
+            key={v}
+            className={`chip chip-dist ${distance === v ? "is-active" : ""}`}
+            onClick={() => onSetDistance(v)}
+            aria-label={`${player.name}: utslag ${v} meter`}
+          >
+            <span className="cone-sm" style={{ background: DISTANCE_COLOR[v] }} />
+            {v}
+          </button>
+        ))}
       </div>
 
       <div className="fl-holes">

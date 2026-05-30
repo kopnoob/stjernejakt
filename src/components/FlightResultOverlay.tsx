@@ -7,12 +7,11 @@ import { STAR_RANK } from "../types";
 
 interface Props {
   outcomes: FlightOutcome[];
-  distance: number;
   onDone: () => void;
 }
 
 /** Felles resultatskjerm for en flight — alles stjerner på én gang. */
-export default function FlightResultOverlay({ outcomes, distance, onDone }: Props) {
+export default function FlightResultOverlay({ outcomes, onDone }: Props) {
   const [show, setShow] = useState(false);
 
   const best = outcomes.reduce<Star>(
@@ -32,7 +31,6 @@ export default function FlightResultOverlay({ outcomes, distance, onDone }: Prop
       {anyGold && <Confetti />}
       <div className={`result-card flight-result ${show ? "is-in" : ""}`}>
         <h2 className="result-title flight-result-title">Flight-resultat</h2>
-        <p className="result-sub muted">{distance} m</p>
 
         <ul className="flight-result-list">
           {outcomes.map((o, i) => (
@@ -46,7 +44,7 @@ export default function FlightResultOverlay({ outcomes, distance, onDone }: Prop
               </span>
               <span className="flight-result-name">
                 {o.player.name}
-                <span className="muted"> · hcp {o.hcp}</span>
+                <span className="muted"> · {o.distance} m</span>
               </span>
               <span className="flight-result-detail muted tabnum">
                 {o.result.holedCount}/3

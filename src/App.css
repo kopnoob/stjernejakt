@@ -1168,6 +1168,7 @@
   gap: 5px;
 }
 .flight-card-star { font-size: 13px; font-weight: 600; }
+.flight-card-chips { margin-bottom: 10px; }
 
 .fl-holes {
   display: grid;
