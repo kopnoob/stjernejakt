@@ -1519,9 +1519,17 @@
   border-radius: var(--r-sm);
   line-height: 1.45;
 }
+/* Jevn vertikal avstand mellom alt i profil-arket (knapper lå for tett). */
+.profile-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.profile-sheet > * { margin: 0; }
+.profile-sheet .profile-divider { margin: 2px 0; }
 .profile-done { width: 100%; }
 .profile-sheet .text-input { width: 100%; }
-.profile-version { text-align: center; font-size: 11.5px; margin-top: 2px; }
+.profile-version { text-align: center; font-size: 11.5px; }
 
 .menu-actions {
   display: flex;
