@@ -59,10 +59,24 @@ og økter.
 
 Uten Supabase fungerer alt fint — da lagres data kun lokalt i nettleseren.
 
-**Sikkerhet (RLS):** datamodellen er *insert-only* — rader endres aldri, og
-sletting er en lokal tombstone på enheten. Derfor tillater
-[`schema.sql`](supabase/schema.sql) kun **lesing + innsetting** for anon-nøkkelen
-(ingen update/delete), selv om nøkkelen er offentlig i dette åpne repoet.
+### Multi-enhet uten innlogging
+
+Hver enhet får en **anonym identitet** (Supabase anonymous sign-in) — ingen
+innloggingsskjerm. Du ser bare spillere du har **tilgang** til, håndhevet av
+Row Level Security i databasen (`players`/`rounds` filtreres på `auth.uid()`
+via `player_access`). Se migrasjonen
+[`20260530120000_multi_device_access.sql`](supabase/migrations/).
+
+- **Gjenopprettingskode:** hver enhet får en kode (vis/kopier via profil-knappen
+  øverst). Med den henter du spillerne dine tilbake på en ny enhet eller etter
+  tømming (`recover`-funksjonen).
+- **Deling:** «Del tilgang» på en spiller lager en lenke (`#/share/<token>`).
+  Åpner den andre forelderen lenken, får de tilgang til den spilleren på sin
+  enhet (`claim_share`). Data dukker opp hos andre først **etter lagring**
+  (insert-only → ingen konflikter).
+
+> **Oppsett:** slå på **Authentication → Anonymous sign-ins** i Supabase, ellers
+> får ikke enhetene en identitet.
 
 **Rydde testdata:** kjør [`supabase/cleanup-testdata.sql`](supabase/cleanup-testdata.sql)
 i SQL Editor for å fjerne test-spillere.

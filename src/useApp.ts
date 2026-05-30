@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getCurrentHcp, newId, setCurrentHcpLocal, store } from "./store";
+import {
+  claimShareToken,
+  createShareToken,
+  getCurrentHcp,
+  newId,
+  recoverProfile,
+  setCurrentHcpLocal,
+  store,
+} from "./store";
+import { cachedUid } from "./lib/supabase";
 import type { HoleResult, Player, Round, Star } from "./types";
 import { evaluateRound } from "./rules";
 
@@ -62,6 +71,7 @@ export function useApp() {
         name: name.trim(),
         color,
         avatar,
+        owner: cachedUid(),
         created_at: new Date().toISOString(),
       };
       setPlayers((prev) => [...prev, p]);
@@ -137,6 +147,40 @@ export function useApp() {
     [],
   );
 
+  // ─── Multi-enhet: deling + gjenoppretting ───────────────────────────────
+
+  /** Lag en delingslenke til en spiller (eller null hvis offline/feil). */
+  const shareLink = useCallback(async (playerId: string): Promise<string | null> => {
+    const token = await createShareToken(playerId);
+    if (!token) return null;
+    const base = `${location.origin}${location.pathname}`;
+    return `${base}#/share/${token}`;
+  }, []);
+
+  /** Krev en delingslenke → få tilgang, last på nytt. */
+  const claimShare = useCallback(
+    async (token: string): Promise<string | null> => {
+      const playerId = await claimShareToken(token);
+      if (playerId) await reload();
+      return playerId;
+    },
+    [reload],
+  );
+
+  /** Gjenopprett med kode. Returnerer antall spillere (-1 = ukjent kode). */
+  const recover = useCallback(
+    async (code: string): Promise<number> => {
+      const n = await recoverProfile(code);
+      if (n >= 0) {
+        const { adoptRecoveryCode } = await import("./lib/supabase");
+        adoptRecoveryCode(code);
+        await reload();
+      }
+      return n;
+    },
+    [reload],
+  );
+
   return {
     players,
     rounds,
@@ -148,6 +192,9 @@ export function useApp() {
     addRounds,
     getHcp,
     setCurrentHcp,
+    shareLink,
+    claimShare,
+    recover,
     backend: store.backend,
   };
 }

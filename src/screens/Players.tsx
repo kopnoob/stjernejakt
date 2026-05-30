@@ -1,10 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import StarIcon from "../components/StarIcon";
 import Icon from "../components/Icon";
+import ProfileModal from "../components/ProfileModal";
 import { hcpProgress } from "../rules";
 import type { Player, Round } from "../types";
 import { PLAYER_AVATARS, PLAYER_COLORS } from "../types";
 import type { SyncState } from "../useApp";
+import { clearRecoveryNew, getRecoveryCode, recoveryIsNew } from "../lib/supabase";
 
 interface Props {
   players: Player[];
@@ -16,13 +18,22 @@ interface Props {
   onAdd: (name: string, color: string, avatar: string | null) => Promise<Player>;
   onFlight: () => void;
   onTournament: () => void;
+  onRecover: (code: string) => Promise<number>;
 }
 
-export default function Players({ players, rounds, backend, syncState, getHcp, onOpen, onAdd, onFlight, onTournament }: Props) {
+export default function Players({ players, rounds, backend, syncState, getHcp, onOpen, onAdd, onFlight, onTournament, onRecover }: Props) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [color, setColor] = useState(PLAYER_COLORS[0]);
   const [avatar, setAvatar] = useState<string | null>(null);
+  // Vis gjenopprettingskoden automatisk én gang når en ny profil er laget.
+  // Initialiseres fra localStorage ved første render (ingen setState i effekt).
+  const [profileOpen, setProfileOpen] = useState<boolean>(() => recoveryIsNew());
+  const [firstRun, setFirstRun] = useState<boolean>(() => recoveryIsNew());
+
+  useEffect(() => {
+    if (recoveryIsNew()) clearRecoveryNew();
+  }, []);
 
   // Per spiller: nåværende hcp + antall gull i det hcp-et (mer relevant
   // enn totalt antall stjerner). current_hcp er lokal (getHcp).
@@ -57,6 +68,16 @@ export default function Players({ players, rounds, backend, syncState, getHcp, o
   return (
     <div className="screen">
       <header className="home-hero">
+        <button
+          className="icon-btn profile-btn"
+          onClick={() => {
+            setFirstRun(false);
+            setProfileOpen(true);
+          }}
+          aria-label="Profil og gjenoppretting"
+        >
+          <Icon name="user" size={22} />
+        </button>
         <div className="home-stars" aria-hidden="true">
           <StarIcon variant="gold" size={26} />
           <StarIcon variant="silver" size={34} />
@@ -181,6 +202,15 @@ export default function Players({ players, rounds, backend, syncState, getHcp, o
           "Lagres på denne enheten"
         )}
       </footer>
+
+      {profileOpen && (
+        <ProfileModal
+          recoveryCode={getRecoveryCode()}
+          firstRun={firstRun}
+          onRecover={onRecover}
+          onClose={() => setProfileOpen(false)}
+        />
+      )}
     </div>
   );
 }

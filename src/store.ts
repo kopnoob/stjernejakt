@@ -13,7 +13,7 @@
 //  - Sletting er en LOKAL tombstone (skjuler raden på denne enheten). Raden
 //    blir liggende i Supabase; permanent fjerning gjøres i dashboardet.
 
-import { getSupabase, supabaseConfigured } from "./lib/supabase";
+import { cachedUid, ensureAuth, getSupabase, supabaseConfigured } from "./lib/supabase";
 import type { Player, Round } from "./types";
 
 const LS_PLAYERS = "sj.players";
@@ -21,6 +21,25 @@ const LS_ROUNDS = "sj.rounds";
 const LS_DELETIONS = "sj.deletions"; // string[] av skjulte spiller-id-er
 const LS_CURRENT_HCP = "sj.currentHcp"; // { [playerId]: hcp }
 const LS_PENDING = "sj.pendingSync"; // ids som ennå ikke er bekreftet pushet
+const LS_VERSION = "sj.storeVersion";
+const STORE_VERSION = "2-multidevice";
+
+// Eldre cache (før multi-enhet) hadde ingen eier og kan ikke synkes i den nye
+// eier-/RLS-modellen. Rydd den én gang ved oppgradering, så starter hver
+// enhet rent med sin egen identitet. (Beholder uid/recovery/turneringer.)
+function migrateLocalCache(): void {
+  try {
+    if (localStorage.getItem(LS_VERSION) === STORE_VERSION) return;
+    localStorage.removeItem(LS_PLAYERS);
+    localStorage.removeItem(LS_ROUNDS);
+    localStorage.removeItem(LS_DELETIONS);
+    localStorage.removeItem(LS_PENDING);
+    localStorage.setItem(LS_VERSION, STORE_VERSION);
+  } catch {
+    /* ignorer */
+  }
+}
+migrateLocalCache();
 
 export type Backend = "supabase" | "local";
 
@@ -142,7 +161,14 @@ class LocalStore implements Store {
 
 /** Felter som faktisk finnes i players-tabellen (current_hcp er lokal). */
 function playerRow(p: Player) {
-  return { id: p.id, name: p.name, color: p.color, avatar: p.avatar ?? null, created_at: p.created_at };
+  return {
+    id: p.id,
+    name: p.name,
+    color: p.color,
+    avatar: p.avatar ?? null,
+    owner: p.owner ?? cachedUid(),
+    created_at: p.created_at,
+  };
 }
 
 class SupabaseStore implements Store {
@@ -153,6 +179,7 @@ class SupabaseStore implements Store {
     const local = await this.cache.load();
     const sb = await getSupabase();
     if (!sb) return local;
+    await ensureAuth(); // anonym identitet må være satt før RLS-spørringer
     try {
       const [{ data: players, error: pe }, { data: rounds, error: re }] = await Promise.all([
         sb.from("players").select("*").order("created_at", { ascending: true }),
@@ -201,6 +228,7 @@ class SupabaseStore implements Store {
   private async tryInsert(table: string, row: object, id: string): Promise<SaveResult> {
     const sb = await getSupabase();
     if (!sb) return { synced: false };
+    await ensureAuth();
     try {
       const { error } = await sb.from(table).insert(row);
       if (error) throw error;
@@ -226,10 +254,14 @@ class SupabaseStore implements Store {
   private async pushMissing(remotePlayers: Player[], remoteRounds: Round[]): Promise<void> {
     const sb = await getSupabase();
     if (!sb) return;
+    const myUid = cachedUid();
     const deleted = new Set(readDeletions());
     const localPlayers = readLS<Player>(LS_PLAYERS).filter((p) => !deleted.has(p.id));
     const localRounds = readLS<Round>(LS_ROUNDS).filter((r) => !deleted.has(r.player_id));
-    const newPlayers = localPlayers.filter((p) => !remotePlayers.some((x) => x.id === p.id));
+    // Push kun spillere DENNE enheten eier (RLS avviser andres uansett).
+    const newPlayers = localPlayers.filter(
+      (p) => (p.owner ?? myUid) === myUid && !remotePlayers.some((x) => x.id === p.id),
+    );
     const newRounds = localRounds.filter((r) => !remoteRounds.some((x) => x.id === r.id));
     try {
       if (newPlayers.length) {
@@ -261,4 +293,47 @@ export const store: Store = supabaseConfigured ? new SupabaseStore() : new Local
 export function newId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
   return "id-" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+// ─── Deling + gjenoppretting ───────────────────────────────────────────────
+
+/** Lag en delingslenke for en spiller. Returnerer token (eller null). */
+export async function createShareToken(playerId: string): Promise<string | null> {
+  const sb = await getSupabase();
+  if (!sb) return null;
+  await ensureAuth();
+  const token = (newId() + newId()).replace(/-/g, "").slice(0, 24);
+  const { error } = await sb.from("player_shares").insert({ token, player_id: playerId });
+  if (error) {
+    logSync("kunne ikke lage delingslenke", error);
+    return null;
+  }
+  return token;
+}
+
+/** Krev en delingslenke → gir denne enheten tilgang. Returnerer player_id. */
+export async function claimShareToken(token: string): Promise<string | null> {
+  const sb = await getSupabase();
+  if (!sb) return null;
+  await ensureAuth();
+  const { data, error } = await sb.rpc("claim_share", { p_token: token });
+  if (error) {
+    logSync("claim_share feilet", error);
+    return null;
+  }
+  return (data as string | null) ?? null;
+}
+
+/** Gjenopprett: knytt denne enheten til kontoen koden tilhører.
+ *  Returnerer antall spillere man fikk tilbake, eller -1 ved ukjent kode. */
+export async function recoverProfile(code: string): Promise<number> {
+  const sb = await getSupabase();
+  if (!sb) return -1;
+  await ensureAuth();
+  const { data, error } = await sb.rpc("recover", { p_code: code.trim() });
+  if (error) {
+    logSync("recover feilet", error);
+    return -1;
+  }
+  return (data as number | null) ?? -1;
 }

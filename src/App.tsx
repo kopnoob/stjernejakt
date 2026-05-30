@@ -6,6 +6,7 @@ import FlightSetup from "./screens/FlightSetup";
 import FlightRound from "./screens/FlightRound";
 import Tournaments from "./screens/Tournaments";
 import Tournament from "./screens/Tournament";
+import ShareClaim from "./screens/ShareClaim";
 import { useApp } from "./useApp";
 import { hcpProgress } from "./rules";
 import { DEFAULT_HCP } from "./types";
@@ -17,7 +18,8 @@ type View =
   | { name: "flight" }
   | { name: "flightRound"; playerIds: string[] }
   | { name: "tournaments" }
-  | { name: "tournament"; id: string };
+  | { name: "tournament"; id: string }
+  | { name: "share"; token: string };
 
 // ─── Hash-routing (F6) ──────────────────────────────────────────────────────
 // Hash-basert ruting gjør nettleserens tilbake-knapp ekte (hvert skjerm-bytte
@@ -31,6 +33,9 @@ type View =
 function parseHash(): View {
   const raw = location.hash.replace(/^#\/?/, "");
   const parts = raw.split("/").filter(Boolean);
+  if (parts[0] === "share" && parts[1]) {
+    return { name: "share", token: parts[1] };
+  }
   if (parts[0] === "turnering") {
     if (parts[1]) return { name: "tournament", id: parts[1] };
     return { name: "tournaments" };
@@ -57,6 +62,7 @@ function toHash(v: View): string {
   if (v.name === "flightRound") return `#/flight/r/${v.playerIds.join(",")}`;
   if (v.name === "tournaments") return "#/turnering";
   if (v.name === "tournament") return `#/turnering/${v.id}`;
+  if (v.name === "share") return `#/share/${v.token}`;
   return "#/";
 }
 
@@ -110,6 +116,18 @@ export default function App() {
         onAdd={app.addPlayer}
         onFlight={() => navigate({ name: "flight" })}
         onTournament={() => navigate({ name: "tournaments" })}
+        onRecover={app.recover}
+      />
+    );
+  }
+
+  if (view.name === "share") {
+    return (
+      <ShareClaim
+        token={view.token}
+        onClaim={app.claimShare}
+        onOpen={(playerId) => navigate({ name: "board", playerId })}
+        onHome={() => navigate({ name: "players" })}
       />
     );
   }
@@ -193,6 +211,7 @@ export default function App() {
         onBack={() => navigate({ name: "players" })}
         onStart={(hcp, distance) => navigate({ name: "round", playerId: player.id, hcp, distance })}
         onSetHcp={(hcp) => app.setCurrentHcp(player.id, hcp)}
+        onShareAccess={() => app.shareLink(player.id)}
         onDelete={async () => {
           await app.deletePlayer(player.id);
           navigate({ name: "players" });

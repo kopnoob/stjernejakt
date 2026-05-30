@@ -25,6 +25,8 @@ export interface Player {
   color: string;
   /** Emoji-figur barnet velger selv (valgfri; fallback = forbokstav). */
   avatar?: string | null;
+  /** Anonym identitet (auth.uid()) som opprettet spilleren. */
+  owner?: string | null;
   created_at: string;
   // Merk: "current_hcp" er flyttet til en lokal enhets-preferanse
   // (se store.ts getCurrentHcp), ikke et delt felt — hindrer at flere

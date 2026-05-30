@@ -15,15 +15,52 @@ interface Props {
   onStart: (hcp: number, distance: number) => void;
   onSetHcp: (hcp: number) => void;
   onDelete: () => void;
+  onShareAccess: () => Promise<string | null>;
 }
 
 type Mode = "journey" | "overview" | "history";
 
-export default function PlayerBoard({ player, rounds, currentHcp, onBack, onStart, onSetHcp, onDelete }: Props) {
+export default function PlayerBoard({ player, rounds, currentHcp, onBack, onStart, onSetHcp, onDelete, onShareAccess }: Props) {
   const [mode, setMode] = useState<Mode>("journey");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [switchHcp, setSwitchHcp] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [accessBusy, setAccessBusy] = useState(false);
+  const [accessLink, setAccessLink] = useState<string | null>(null);
+  const [accessMsg, setAccessMsg] = useState<string | null>(null);
+
+  async function shareAccess() {
+    setMenuOpen(false);
+    setAccessBusy(true);
+    setAccessMsg(null);
+    const link = await onShareAccess();
+    setAccessBusy(false);
+    if (!link) {
+      setAccessLink(null);
+      setAccessMsg("Kunne ikke lage lenke. Er du på nett?");
+      return;
+    }
+    setAccessLink(link);
+    const nav = navigator as Navigator & { canShare?: (d: { url: string }) => boolean };
+    if (navigator.share && (nav.canShare?.({ url: link }) ?? true)) {
+      try {
+        await navigator.share({ title: `${player.name} – Stjernejakt`, url: link });
+      } catch {
+        /* bruker avbrøt — lenken vises uansett under */
+      }
+    }
+  }
+
+  async function copyLink() {
+    if (!accessLink) return;
+    try {
+      await navigator.clipboard.writeText(accessLink);
+      setAccessMsg("Lenke kopiert ✓");
+    } catch {
+      setAccessMsg("Kopier lenken manuelt nedenfor.");
+    }
+  }
 
   const playerRounds = useMemo(
     () => rounds.filter((r) => r.player_id === player.id),
@@ -85,8 +122,8 @@ export default function PlayerBoard({ player, rounds, currentHcp, onBack, onStar
           </span>
           {player.name}
         </span>
-        <button className="icon-btn" onClick={() => setConfirmDelete(true)} aria-label="Mer">
-          <Icon name="more" size={22} />
+        <button className="icon-btn" onClick={() => setMenuOpen(true)} aria-label="Mer">
+          {accessBusy ? <span className="mini-spin" /> : <Icon name="more" size={22} />}
         </button>
       </header>
 
@@ -168,12 +205,70 @@ export default function PlayerBoard({ player, rounds, currentHcp, onBack, onStar
         {sharing ? "Lager diplom …" : "Del diplom"}
       </button>
 
+      {menuOpen && (
+        <Modal onClose={() => setMenuOpen(false)} labelledBy="menu-title">
+          <p className="sheet-title" id="menu-title">
+            {player.name}
+          </p>
+          <div className="menu-actions">
+            <button className="btn btn-ghost menu-action" onClick={shareAccess}>
+              <Icon name="share" size={18} /> Del tilgang
+            </button>
+            <button
+              className="btn btn-ghost menu-action menu-danger"
+              onClick={() => {
+                setMenuOpen(false);
+                setConfirmDelete(true);
+              }}
+            >
+              Skjul på denne enheten
+            </button>
+          </div>
+          <p className="muted menu-hint">
+            «Del tilgang» lager en lenke så en annen forelder kan se og legge til
+            resultater for {player.name} på sin egen enhet.
+          </p>
+        </Modal>
+      )}
+
+      {accessLink !== null && (
+        <Modal onClose={() => setAccessLink(null)} labelledBy="share-title">
+          <p className="sheet-title" id="share-title">
+            Del tilgang til {player.name}
+          </p>
+          <p className="muted">
+            Send denne lenken til den andre forelderen. Når de åpner den får de
+            tilgang til {player.name} på sin enhet.
+          </p>
+          <div className="share-link tabnum">{accessLink}</div>
+          <button className="btn btn-primary" onClick={copyLink}>
+            Kopier lenke
+          </button>
+          {accessMsg && <p className="profile-msg">{accessMsg}</p>}
+        </Modal>
+      )}
+
+      {accessMsg && accessLink === null && !menuOpen && (
+        <Modal onClose={() => setAccessMsg(null)} labelledBy="share-err">
+          <p className="sheet-title" id="share-err">
+            Deling
+          </p>
+          <p className="muted">{accessMsg}</p>
+          <button className="btn btn-primary" onClick={() => setAccessMsg(null)}>
+            OK
+          </button>
+        </Modal>
+      )}
+
       {confirmDelete && (
         <Modal onClose={() => setConfirmDelete(false)} labelledBy="delete-title">
           <p className="sheet-title" id="delete-title">
-            Slette {player.name}?
+            Skjul {player.name}?
           </p>
-          <p className="muted">Alle runder og stjerner forsvinner. Dette kan ikke angres.</p>
+          <p className="muted">
+            {player.name} skjules på denne enheten. Dataene blir liggende trygt og
+            kan hentes tilbake (også via deling/gjenoppretting).
+          </p>
           <div className="add-actions">
             <button className="btn btn-ghost" onClick={() => setConfirmDelete(false)}>
               Avbryt
@@ -185,7 +280,7 @@ export default function PlayerBoard({ player, rounds, currentHcp, onBack, onStar
                 onDelete();
               }}
             >
-              Slett
+              Skjul
             </button>
           </div>
         </Modal>
