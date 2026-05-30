@@ -1265,6 +1265,169 @@
 .flight-result-detail { font-size: 12.5px; }
 .flight-result-star { flex-shrink: 0; display: grid; place-items: center; }
 
+/* ─── Turnering ─────────────────────────────────────────── */
+.entry-row { display: flex; gap: 8px; }
+.entry-row .btn-flight { flex: 1; }
+
+.tour-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: var(--card);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-sm);
+  padding: 14px 16px;
+}
+.tour-card:active { transform: scale(0.99); }
+.tour-card-main { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tour-card-name { font-family: var(--display); font-weight: 600; font-size: 17px; }
+.tour-card-sub { font-size: 12.5px; }
+.tour-badge {
+  flex-shrink: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+}
+.tour-badge.is-live { background: var(--green-tint); color: var(--green-600); }
+.tour-badge.is-done { background: var(--gold-tint); color: #8a5a00; }
+
+.holes-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--card-sunken);
+  border-radius: var(--r-pill);
+  padding: 5px;
+  align-self: flex-start;
+}
+.holes-value { font-family: var(--display); font-weight: 700; font-size: 24px; min-width: 28px; text-align: center; }
+
+/* Ledertavle */
+.leaderboard {
+  background: var(--card);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.leaderboard-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ink-2);
+  margin-bottom: 2px;
+}
+.lb-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: var(--r-sm);
+}
+.lb-row.is-leader { background: var(--gold-tint); }
+.lb-rank { width: 24px; text-align: center; font-weight: 700; font-size: 15px; flex-shrink: 0; }
+.lb-name { flex: 1; font-family: var(--display); font-weight: 600; font-size: 15px; min-width: 0; }
+.lb-thru { font-size: 12px; flex-shrink: 0; }
+.lb-total {
+  flex-shrink: 0;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 20px;
+  min-width: 34px;
+  text-align: right;
+}
+
+/* Hull-navigasjon */
+.hole-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--card-sunken);
+  border-radius: var(--r-pill);
+  padding: 4px;
+}
+.hole-nav-label { font-family: var(--display); font-weight: 600; font-size: 16px; }
+.hole-nav-label strong { font-size: 20px; color: var(--green); }
+.hole-nav .icon-btn { background: var(--card); }
+.hole-nav-next svg { transform: rotate(180deg); }
+.hole-nav .icon-btn:disabled { opacity: 0.3; }
+
+/* Inntasting pr spiller */
+.tour-score-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--card);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-sm);
+  padding: 10px 14px;
+}
+.tour-score-name {
+  flex: 1;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 16px;
+  min-width: 0;
+}
+.tour-stepper { width: auto; flex-shrink: 0; gap: 8px; }
+.tour-stepper .fl-val { min-width: 30px; }
+
+/* Scorekort-grid */
+.scorecard-wrap {
+  background: var(--card);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+  padding: 10px 8px;
+  overflow-x: auto;
+}
+.scorecard { width: 100%; border-collapse: collapse; }
+.scorecard th, .scorecard td { padding: 7px 4px; text-align: center; }
+.sc-corner, .sc-hole {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--ink-2);
+  text-align: left;
+}
+.sc-hole-btn {
+  font-family: var(--display);
+  font-weight: 600;
+  color: var(--green);
+  padding: 2px 6px;
+}
+.avatar-xs { width: 26px; height: 26px; border-radius: 8px; font-size: 13px; }
+.sc-player { padding-bottom: 6px; }
+.sc-cell { font-size: 15px; font-variant-numeric: tabular-nums; }
+.sc-total-row { border-top: 2px solid var(--line); }
+.sc-total { font-family: var(--display); font-weight: 700; font-size: 17px; }
+.sc-total-row .sc-hole { color: var(--ink); }
+
+/* Resultat */
+.tour-winner {
+  margin-top: 10px;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 20px;
+  color: #8a5a00;
+}
+.flight-result-row.is-leader { background: var(--gold-tint); }
+.tour-result-total {
+  flex-shrink: 0;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 18px;
+  min-width: 30px;
+  text-align: right;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;

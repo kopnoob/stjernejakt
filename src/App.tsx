@@ -4,6 +4,8 @@ import PlayerBoard from "./screens/PlayerBoard";
 import Round from "./screens/Round";
 import FlightSetup from "./screens/FlightSetup";
 import FlightRound from "./screens/FlightRound";
+import Tournaments from "./screens/Tournaments";
+import Tournament from "./screens/Tournament";
 import { useApp } from "./useApp";
 import { hcpProgress } from "./rules";
 import { DEFAULT_HCP } from "./types";
@@ -13,7 +15,9 @@ type View =
   | { name: "board"; playerId: string }
   | { name: "round"; playerId: string; hcp: number; distance: number }
   | { name: "flight" }
-  | { name: "flightRound"; distance: number; playerIds: string[] };
+  | { name: "flightRound"; distance: number; playerIds: string[] }
+  | { name: "tournaments" }
+  | { name: "tournament"; id: string };
 
 // ─── Hash-routing (F6) ──────────────────────────────────────────────────────
 // Hash-basert ruting gjør nettleserens tilbake-knapp ekte (hvert skjerm-bytte
@@ -27,6 +31,10 @@ type View =
 function parseHash(): View {
   const raw = location.hash.replace(/^#\/?/, "");
   const parts = raw.split("/").filter(Boolean);
+  if (parts[0] === "turnering") {
+    if (parts[1]) return { name: "tournament", id: parts[1] };
+    return { name: "tournaments" };
+  }
   if (parts[0] === "flight") {
     if (parts[1] === "r" && parts[2] && parts[3]) {
       return { name: "flightRound", distance: Number(parts[2]), playerIds: parts[3].split(",").filter(Boolean) };
@@ -47,6 +55,8 @@ function toHash(v: View): string {
   if (v.name === "round") return `#/p/${v.playerId}/r/${v.hcp}/${v.distance}`;
   if (v.name === "flight") return "#/flight";
   if (v.name === "flightRound") return `#/flight/r/${v.distance}/${v.playerIds.join(",")}`;
+  if (v.name === "tournaments") return "#/turnering";
+  if (v.name === "tournament") return `#/turnering/${v.id}`;
   return "#/";
 }
 
@@ -99,6 +109,27 @@ export default function App() {
         onOpen={(playerId) => navigate({ name: "board", playerId })}
         onAdd={app.addPlayer}
         onFlight={() => navigate({ name: "flight" })}
+        onTournament={() => navigate({ name: "tournaments" })}
+      />
+    );
+  }
+
+  if (view.name === "tournaments") {
+    return (
+      <Tournaments
+        players={app.players}
+        getHcp={app.getHcp}
+        onBack={() => navigate({ name: "players" })}
+        onOpen={(id) => navigate({ name: "tournament", id })}
+      />
+    );
+  }
+
+  if (view.name === "tournament") {
+    return (
+      <Tournament
+        id={view.id}
+        onBack={() => navigate({ name: "tournaments" })}
       />
     );
   }

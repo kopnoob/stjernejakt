@@ -15,9 +15,10 @@ interface Props {
   onOpen: (playerId: string) => void;
   onAdd: (name: string, color: string, avatar: string | null) => Promise<Player>;
   onFlight: () => void;
+  onTournament: () => void;
 }
 
-export default function Players({ players, rounds, backend, syncState, getHcp, onOpen, onAdd, onFlight }: Props) {
+export default function Players({ players, rounds, backend, syncState, getHcp, onOpen, onAdd, onFlight, onTournament }: Props) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [color, setColor] = useState(PLAYER_COLORS[0]);
@@ -156,10 +157,16 @@ export default function Players({ players, rounds, backend, syncState, getHcp, o
         )}
 
         {players.length >= 2 && !adding && (
-          <button className="btn btn-flight" onClick={onFlight}>
-            <Icon name="flight" size={20} />
-            Følg en flight
-          </button>
+          <div className="entry-row">
+            <button className="btn btn-flight" onClick={onFlight}>
+              <Icon name="flight" size={20} />
+              Følg en flight
+            </button>
+            <button className="btn btn-flight" onClick={onTournament}>
+              <Icon name="trophy" size={20} />
+              Turnering
+            </button>
+          </div>
         )}
       </div>
 
