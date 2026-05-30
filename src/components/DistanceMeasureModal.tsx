@@ -3,7 +3,6 @@ import Modal from "./Modal";
 import { haptic } from "../lib/haptics";
 import {
   averageSamples,
-  combinedAccuracy,
   geolocationAvailable,
   haversineMeters,
   nearestDistance,
@@ -93,10 +92,7 @@ export default function DistanceMeasureModal({ onPick, onClose }: Props) {
 
   const distance = hole && current ? haversineMeters(hole, current) : null;
   const nearest = distance != null ? nearestDistance(distance, DISTANCES) : null;
-  const uncertainty = combinedAccuracy(hole?.accuracy, current?.accuracy);
-
-  const acc = current?.accuracy;
-  const accClass = acc == null ? "" : acc <= 8 ? "good" : acc <= 20 ? "ok" : "poor";
+  const hasFix = current != null;
 
   return (
     <Modal onClose={onClose} labelledBy="measure-title" className="measure-sheet">
@@ -113,8 +109,8 @@ export default function DistanceMeasureModal({ onPick, onClose }: Props) {
         </>
       ) : (
         <>
-          <div className={`measure-acc ${accClass}`}>
-            {acc == null ? "Søker etter GPS …" : `GPS-nøyaktighet: ±${Math.round(acc)} m`}
+          <div className={`measure-acc ${hasFix ? "good" : ""}`}>
+            {hasFix ? "GPS klar" : "Søker etter GPS …"}
           </div>
 
           {phase !== "ready" && (
@@ -137,7 +133,6 @@ export default function DistanceMeasureModal({ onPick, onClose }: Props) {
               <div className="measure-readout">
                 <span className="measure-dist tabnum">{Math.round(distance)}</span>
                 <span className="measure-unit">m</span>
-                <span className="measure-pm muted">± {uncertainty} m</span>
               </div>
               <p className="measure-nearest">
                 Nærmest: <strong>{nearest} m</strong>
@@ -157,10 +152,6 @@ export default function DistanceMeasureModal({ onPick, onClose }: Props) {
               </button>
             </>
           )}
-
-          <p className="muted measure-disclaimer">
-            GPS gir en omtrentlig avstand — best på lange utslag, upresis på 10–20 m.
-          </p>
         </>
       )}
     </Modal>

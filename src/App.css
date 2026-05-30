@@ -909,8 +909,6 @@
   margin: 4px auto 10px;
 }
 .measure-acc.good { background: var(--green-tint); color: var(--green-600); }
-.measure-acc.ok { background: var(--gold-tint); color: #8a5a00; }
-.measure-acc.poor { background: #fbe3e0; color: #a3402f; }
 .measure-step { font-size: 14px; margin-bottom: 12px; }
 .measure-readout {
   display: flex;
@@ -932,10 +930,8 @@
   font-size: 24px;
   color: var(--green);
 }
-.measure-pm { font-size: 15px; margin-left: 6px; }
 .measure-nearest { text-align: center; font-size: 17px; margin: 6px 0; }
 .measure-hint { font-size: 12.5px; text-align: center; margin-bottom: 12px; }
-.measure-disclaimer { font-size: 12px; text-align: center; margin-top: 14px; }
 .measure-error { font-size: 14px; color: #a3402f; text-align: center; padding: 10px 0 14px; }
 
 /* ─── Runde: oppsett ────────────────────────────────────── */
