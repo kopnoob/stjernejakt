@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import StarIcon from "./StarIcon";
+import Confetti from "./Confetti";
 import type { RoundResult } from "../rules";
 import type { BadgeDef } from "../lib/badges";
 import { playCelebration } from "../lib/sound";
@@ -57,7 +58,7 @@ export default function ResultOverlay({
 
   return (
     <div className="overlay">
-      {hasStar && <Confetti star={result.star} />}
+      {hasStar && <StarConfetti star={result.star} />}
       <div className={`result-card ${show ? "is-in" : ""}`}>
         <button
           key={tapCount}
@@ -121,37 +122,12 @@ function title(star: string, name: string): string {
   }
 }
 
-function Confetti({ star }: { star: string }) {
+function StarConfetti({ star }: { star: string }) {
   const colors =
     star === "gold"
       ? ["#efb014", "#fbe7a6", "#fff", "#43a463"]
       : star === "silver"
       ? ["#9aa6ad", "#eceef0", "#fff"]
       : ["#c77b3c", "#f6e6d6", "#fff"];
-  const count = star === "gold" ? 40 : 28;
-  const pieces = Array.from({ length: count }, (_, i) => i);
-  return (
-    <div className="confetti" aria-hidden="true">
-      {pieces.map((i) => {
-        const left = (i * 37) % 100;
-        const delay = (i % 7) * 0.08;
-        const dur = 1.6 + ((i * 13) % 10) / 10;
-        const c = colors[i % colors.length];
-        const rot = (i * 47) % 360;
-        return (
-          <span
-            key={i}
-            className="confetti-piece"
-            style={{
-              left: `${left}%`,
-              background: c,
-              animationDelay: `${delay}s`,
-              animationDuration: `${dur}s`,
-              transform: `rotate(${rot}deg)`,
-            }}
-          />
-        );
-      })}
-    </div>
-  );
+  return <Confetti colors={colors} count={star === "gold" ? 40 : 28} />;
 }

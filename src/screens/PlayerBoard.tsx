@@ -4,14 +4,20 @@ import Icon from "../components/Icon";
 import Modal from "../components/Modal";
 import RulesModal from "../components/RulesModal";
 import { hcpProgress, nextHcpDown } from "../rules";
-import type { Player, Round, Star } from "../types";
+import type { CoachAwardKind, Player, Round, Star, TrainingEntry } from "../types";
 import { DISTANCES, DISTANCE_COLOR, HCP_RANGE, MAX_STARS_PER_HCP } from "../types";
 import { buildDiploma, shareDiploma } from "../lib/diploma";
-import { BADGES, earnedBadges } from "../lib/badges";
+import Golfbag from "../components/Golfbag";
+import GolfbagStrip from "../components/GolfbagStrip";
+import BadgeSheet from "../components/BadgeSheet";
+import CoachAwardSheet from "../components/CoachAwardSheet";
+import TrainingCelebration from "../components/TrainingCelebration";
+import { computeBag, getAchievement, newlyEarned, type EarnedItem } from "../lib/achievements";
 
 interface Props {
   player: Player;
   rounds: Round[];
+  entries: TrainingEntry[];
   currentHcp: number;
   onBack: () => void;
   onStart: (hcp: number, distance: number) => void;
@@ -20,18 +26,24 @@ interface Props {
   onShareAccess: () => Promise<string | null>;
   onEditRound: (roundId: string) => void;
   onDeleteRound: (roundId: string) => Promise<void>;
+  onTrain: () => void;
+  onAward: (award: CoachAwardKind, note: string | null) => Promise<TrainingEntry>;
+  /** Slett (myk) en treningsregistrering — brukes for trenermerker. */
+  onDeleteEntry: (entryId: string) => Promise<void>;
 }
 
-type Mode = "journey" | "overview" | "history";
+type Mode = "journey" | "overview" | "history" | "bag";
 
-export default function PlayerBoard({ player, rounds, currentHcp, onBack, onStart, onSetHcp, onDelete, onShareAccess, onEditRound, onDeleteRound }: Props) {
+export default function PlayerBoard({ player, rounds, entries, currentHcp, onBack, onStart, onSetHcp, onDelete, onShareAccess, onEditRound, onDeleteRound, onTrain, onAward, onDeleteEntry }: Props) {
   const [mode, setMode] = useState<Mode>("journey");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [switchHcp, setSwitchHcp] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
-  const [openBadge, setOpenBadge] = useState<string | null>(null);
+  const [sheetId, setSheetId] = useState<string | null>(null);
+  const [awardOpen, setAwardOpen] = useState(false);
+  const [celebration, setCelebration] = useState<EarnedItem[] | null>(null);
   const [accessBusy, setAccessBusy] = useState(false);
   const [accessLink, setAccessLink] = useState<string | null>(null);
   const [accessMsg, setAccessMsg] = useState<string | null>(null);
@@ -77,9 +89,19 @@ export default function PlayerBoard({ player, rounds, currentHcp, onBack, onStar
   const prog = useMemo(() => hcpProgress(playerRounds, hcp), [playerRounds, hcp]);
   const downHcp = nextHcpDown(hcp);
 
-  // H4: opptjente milepæl-merker (på tvers av alle handicap).
-  const earned = useMemo(() => earnedBadges(playerRounds), [playerRounds]);
-  const openBadgeDef = openBadge ? BADGES.find((b) => b.id === openBadge) ?? null : null;
+  // Golfbagen: alle merker regnes ut fra runder + treningsregistreringer.
+  const playerEntries = useMemo(
+    () => entries.filter((e) => e.player_id === player.id),
+    [entries, player.id],
+  );
+  const bag = useMemo(() => computeBag(playerRounds, playerEntries), [playerRounds, playerEntries]);
+  const sheetDef = sheetId ? getAchievement(sheetId) : undefined;
+
+  async function giveAward(award: CoachAwardKind, note: string | null) {
+    const entry = await onAward(award, note);
+    setAwardOpen(false);
+    setCelebration(newlyEarned(bag, computeBag(playerRounds, [...playerEntries, entry])));
+  }
 
   // Hvilke hcp er ferdig (alle 7 gull) — vises i hcp-velgeren.
   const completedHcps = useMemo(() => {
@@ -191,37 +213,8 @@ export default function PlayerBoard({ player, rounds, currentHcp, onBack, onStar
         )}
       </div>
 
-      {/* H4: merke-rad — opptjente i farger, låste dimmet. Trykk for tips. */}
-      <div className="badge-section">
-        <div className="badge-row" aria-label="Merker">
-          {BADGES.map((b) => {
-            const has = earned.has(b.id);
-            return (
-              <button
-                key={b.id}
-                className={`badge ${has ? "is-earned" : "is-locked"} ${
-                  openBadge === b.id ? "is-open" : ""
-                }`}
-                onClick={() => setOpenBadge((cur) => (cur === b.id ? null : b.id))}
-                aria-label={`${b.label}${has ? " – oppnådd" : " – låst"}`}
-                aria-pressed={openBadge === b.id}
-              >
-                <span className="badge-emoji" aria-hidden="true">
-                  {b.emoji}
-                </span>
-                <span className="badge-label">{b.label}</span>
-              </button>
-            );
-          })}
-        </div>
-        {openBadgeDef && (
-          <p className="badge-hint muted">
-            {earned.has(openBadgeDef.id)
-              ? `${openBadgeDef.emoji} ${openBadgeDef.label} – oppnådd!`
-              : `🔒 ${openBadgeDef.hint}`}
-          </p>
-        )}
-      </div>
+      {/* Golfbagen: de nyeste merkene — trykk for hele samlingen. */}
+      <GolfbagStrip bag={bag} onOpen={() => setMode("bag")} />
 
       {/* Reise / oversikt / historikk */}
       <div className="mode-toggle">
@@ -233,6 +226,9 @@ export default function PlayerBoard({ player, rounds, currentHcp, onBack, onStar
         </button>
         <button className={mode === "history" ? "is-on" : ""} onClick={() => setMode("history")}>
           Historikk
+        </button>
+        <button className={mode === "bag" ? "is-on" : ""} onClick={() => setMode("bag")}>
+          Merker
         </button>
       </div>
 
@@ -259,6 +255,9 @@ export default function PlayerBoard({ player, rounds, currentHcp, onBack, onStar
       {mode === "history" && (
         <History rounds={playerRounds} onEdit={onEditRound} onDelete={onDeleteRound} />
       )}
+      {mode === "bag" && (
+        <Golfbag bag={bag} entries={playerEntries} onOpen={setSheetId} onTrain={onTrain} />
+      )}
 
       {/* C1: del diplom */}
       <button className="btn btn-ghost btn-share" onClick={shareDiplomaNow} disabled={sharing}>
@@ -276,6 +275,15 @@ export default function PlayerBoard({ player, rounds, currentHcp, onBack, onStar
           <div className="menu-actions">
             <button className="btn btn-ghost menu-action" onClick={shareAccess}>
               <Icon name="share" size={18} /> Del tilgang
+            </button>
+            <button
+              className="btn btn-ghost menu-action"
+              onClick={() => {
+                setMenuOpen(false);
+                setAwardOpen(true);
+              }}
+            >
+              ❤️ Gi trenerens merke
             </button>
             <button
               className="btn btn-ghost menu-action menu-danger"
@@ -321,6 +329,36 @@ export default function PlayerBoard({ player, rounds, currentHcp, onBack, onStar
             OK
           </button>
         </Modal>
+      )}
+
+      {sheetDef && (
+        <BadgeSheet
+          def={sheetDef}
+          state={bag.badges[sheetDef.id]}
+          onClose={() => setSheetId(null)}
+          onTrain={
+            sheetDef.kind === "value" || sheetDef.kind === "series"
+              ? () => {
+                  setSheetId(null);
+                  onTrain();
+                }
+              : null
+          }
+          onDeleteAward={(entryId) => void onDeleteEntry(entryId)}
+        />
+      )}
+
+      {awardOpen && (
+        <CoachAwardSheet player={player} onAward={giveAward} onClose={() => setAwardOpen(false)} />
+      )}
+
+      {celebration && celebration.length > 0 && (
+        <TrainingCelebration
+          player={player}
+          items={celebration}
+          record={null}
+          onDone={() => setCelebration(null)}
+        />
       )}
 
       {confirmDelete && (

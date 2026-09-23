@@ -505,53 +505,329 @@
   box-shadow: var(--shadow-sm);
 }
 
-/* ─── Merker (H4) ───────────────────────────────────────── */
-.badge-section {
+/* ─── Merker / golfbagen ────────────────────────────────── */
+.pin { display: block; flex-shrink: 0; overflow: visible; }
+.pin-pop { animation: pin-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@keyframes pin-pop {
+  0% { transform: scale(0.4) rotate(-12deg); opacity: 0; }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+
+/* Kompakt stripe på spillerkortet (de nyeste merkene). */
+.bag-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 12px;
+  background: var(--card);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+  transition: transform 0.12s ease;
+}
+.bag-strip:active { transform: scale(0.99); }
+.bag-strip-pins { display: flex; gap: 4px; flex: 1; min-width: 0; overflow: hidden; }
+.bag-strip-empty { flex: 1; font-size: 13px; line-height: 1.3; }
+.bag-strip-go { flex-shrink: 0; font-size: 13px; font-weight: 600; color: var(--green-600); }
+
+/* Hele golfbagen («Merker»-fanen). */
+.golfbag {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 12px;
+  background: var(--card);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+  padding: 16px;
 }
-.badge-row {
-  display: flex;
-  gap: 6px;
+.golfbag-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.golfbag-title { font-size: 20px; }
+.golfbag-secret { font-size: 12.5px; font-weight: 600; color: #8a5a00; }
+.golfbag-secret.muted { color: var(--ink-3); font-weight: 500; }
+.golfbag-empty { margin: 0; font-size: 14px; }
+.golfbag-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 12px 6px;
 }
-.badge {
-  flex: 1;
+.golfbag-pin {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  padding: 8px 4px;
-  border-radius: var(--r-sm, 12px);
+  padding: 6px 2px;
+  border-radius: var(--r-sm);
+  text-align: center;
+}
+.golfbag-pin:active { background: var(--card-sunken); transform: scale(0.96); }
+.golfbag-name { font-family: var(--display); font-weight: 600; font-size: 13.5px; line-height: 1.15; }
+.golfbag-sub { font-size: 11px; color: var(--ink-2); line-height: 1.2; }
+.golfbag-pin.is-mystery .golfbag-name { color: var(--ink-2); }
+.golfbag-today {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.golfbag-today-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
+.golfbag-today-list,
+.pad-today-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.today-chip {
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: var(--r-pill);
+  background: var(--card-sunken);
+  color: var(--ink-2);
+}
+.today-chip.is-earned { background: var(--gold-tint); color: #8a5a00; }
+.golfbag-train { margin-top: 2px; }
+
+/* Detalj-ark for ett merke. */
+.badge-sheet-head { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+.badge-sheet-desc { margin: 2px 0 0; font-size: 14px; }
+.badge-sheet-fact { font-weight: 600; margin: 4px 0 10px; }
+.badge-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.badge-step { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.badge-step.is-next {
+  background: var(--green-tint);
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+  margin: 0 -10px;
+}
+.badge-step-text { flex: 1; min-width: 0; }
+.badge-step-date { font-size: 12px; white-space: nowrap; }
+.badge-later { display: flex; gap: 6px; margin-top: 10px; }
+.step-dot {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(32, 52, 42, 0.35);
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.step-dot.is-small { width: 11px; height: 11px; }
+.coach-awards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.coach-award {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--card-sunken);
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+}
+.coach-award-emoji { font-size: 26px; line-height: 1; }
+.coach-award-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; font-size: 14px; }
+.coach-award-date { font-size: 12px; }
+.coach-award-confirm { display: flex; }
+.coach-award .btn-textlink { min-height: 36px; padding: 6px 8px; }
+
+/* Trenerens merke: velg type. */
+.coach-kinds { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0 16px; }
+.coach-kind {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  min-height: 52px;
+  border-radius: var(--r-sm);
+  background: var(--card-sunken);
+  border: 2px solid transparent;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--ink-2);
+  text-align: left;
+}
+.coach-kind.is-selected { border-color: var(--d100); background: #fbe9f2; color: var(--ink); }
+.coach-kind-emoji { font-size: 24px; line-height: 1; }
+.coach-note { width: 100%; margin-top: 8px; }
+
+/* Feiring (trening). */
+.celebrate-player {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--ink-2);
+}
+.celebrate-title { font-size: 25px; }
+.celebrate-next { margin: 12px 0 0; font-size: 13px; }
+
+/* ─── Trening ───────────────────────────────────────────── */
+.train-players {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 2px 4px;
+  margin: 0 -2px;
+  scrollbar-width: none;
+}
+.train-players::-webkit-scrollbar { display: none; }
+.train-player {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px 6px 6px;
+  min-height: 44px;
+  border-radius: var(--r-pill);
   background: var(--card);
   box-shadow: var(--shadow-sm);
   border: 2px solid transparent;
-  transition: transform 0.1s ease;
-}
-.badge:active { transform: scale(0.96); }
-.badge.is-open { border-color: var(--green); }
-.badge-emoji {
-  font-size: 24px;
-  line-height: 1;
-}
-.badge-label {
-  font-size: 10.5px;
+  font-family: var(--display);
   font-weight: 600;
-  text-align: center;
-  line-height: 1.15;
+  font-size: 15px;
   color: var(--ink-2);
 }
-.badge.is-earned .badge-label { color: var(--ink); }
-.badge.is-locked {
-  background: transparent;
-  box-shadow: none;
-  border-color: var(--line);
+.train-player.is-on { color: var(--ink); box-shadow: var(--shadow); }
+.train-desc { margin: -4px 2px 0; font-size: 14px; }
+.train-areas { display: flex; flex-direction: column; gap: 18px; }
+.train-area { display: flex; flex-direction: column; gap: 8px; }
+.train-area-title {
+  font-family: var(--body);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+  margin: 0 2px;
 }
-.badge.is-locked .badge-emoji { filter: grayscale(1); opacity: 0.4; }
-.badge-hint {
-  font-size: 12.5px;
-  text-align: center;
-  margin: 0;
+.train-ex {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px 10px 10px;
+  background: var(--card);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+  transition: transform 0.12s ease;
+}
+.train-ex:active { transform: scale(0.985); }
+.train-ex-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.train-ex-name { font-family: var(--display); font-weight: 600; font-size: 18px; }
+.train-ex-next { font-size: 13px; line-height: 1.3; }
+.train-ex-go { color: var(--green); font-size: 14px; }
+.train-award { margin-top: 4px; }
+
+/* Registrering (serie og lengde). */
+.pad {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--card);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+  padding: 16px;
+}
+.pad-steps { display: flex; gap: 6px; justify-content: space-between; }
+.step-pick {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid rgba(32, 52, 42, 0.35);
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 15px;
+  display: grid;
+  place-items: center;
+  transition: transform 0.12s ease;
+}
+.step-pick.is-on { transform: scale(1.14); box-shadow: 0 0 0 3px var(--card), 0 0 0 5px var(--ink); }
+.pad-req { margin: 0; font-size: 16px; }
+.pad-note { margin: -8px 0 0; font-size: 13px; }
+.pad-ref { display: flex; flex-direction: column; gap: 8px; }
+.pad-ref .field-label { margin-bottom: 0; }
+.pad-ref-row { display: flex; align-items: center; gap: 8px; }
+.pad-ref-input,
+.pad-length-input {
+  width: 110px;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 22px;
+  padding: 10px 14px;
+}
+.pad-unit { font-size: 16px; color: var(--ink-2); }
+.pad-hint { margin: 0; font-size: 14px; font-weight: 600; color: var(--green-600); }
+.pad-window { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.pad-balls { display: flex; gap: 8px; }
+.pad-ball {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 18px;
+}
+.pad-ball.is-empty { border: 2px dashed var(--line); }
+.pad-ball.is-hit {
+  background: var(--green-tint);
+  color: var(--green-600);
+  border: 2px solid var(--green-300);
+  animation: num-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.pad-ball.is-miss { background: var(--card-sunken); color: var(--ink-3); border: 2px solid var(--line); }
+.pad-status { margin: 0; font-weight: 600; font-size: 15px; color: var(--ink-2); text-align: center; }
+.pad-status.is-warm { color: var(--green-600); }
+.pad-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pad-buttons.n3 { grid-template-columns: 1fr 1fr 1fr; }
+.pad-btn {
+  min-height: 72px;
+  border-radius: var(--r);
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 19px;
+  transition: transform 0.1s ease;
+}
+.pad-btn:active { transform: scale(0.96); }
+.pad-btn:disabled { opacity: 0.4; }
+.pad-btn.is-hit { background: var(--green-grad); color: #fff; box-shadow: 0 6px 16px rgba(31, 107, 67, 0.3); }
+.pad-btn.is-miss { background: var(--card-sunken); color: var(--ink-2); border: 2px solid var(--line); }
+.pad-btn.is-holed { background: var(--gold-grad); color: #5b3b00; box-shadow: 0 6px 16px rgba(231, 164, 15, 0.35); }
+.pad-error { margin: 0; font-size: 14px; font-weight: 600; color: #b5453a; }
+.pad-foot { display: flex; align-items: center; justify-content: space-between; margin: -6px 0; font-size: 14px; }
+.pad-foot .btn-textlink,
+.pad-today .btn-textlink { align-self: flex-start; padding-left: 0; }
+.pad-foot .btn-textlink:disabled,
+.pad-today .btn-textlink:disabled { opacity: 0.4; }
+.pad-record { display: flex; flex-direction: column; gap: 2px; }
+.pad-record-main { margin: 0; font-family: var(--display); font-weight: 600; font-size: 19px; }
+.pad-record-next { margin: 0; font-size: 14px; }
+.pad-length-save { flex: 1; min-height: 52px; padding: 10px 14px; }
+.pad-today { display: flex; flex-direction: column; gap: 8px; }
+.pad-today .field-label { margin-bottom: 0; }
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 24px);
+  transform: translateX(-50%);
+  z-index: 45;
+  background: var(--ink);
+  color: #fff;
+  font-weight: 600;
+  font-size: 15px;
+  padding: 12px 18px;
+  border-radius: var(--r-pill);
+  box-shadow: var(--shadow-lg);
+  white-space: nowrap;
 }
 
 /* ─── Reise (sti av utslag) ─────────────────────────────── */
@@ -1172,6 +1448,7 @@
   transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease;
 }
 .result-card.is-in { transform: scale(1); opacity: 1; }
+.result-card:focus { outline: none; }
 .result-star {
   display: grid;
   place-items: center;

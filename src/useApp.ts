@@ -11,8 +11,11 @@ import {
   store,
 } from "./store";
 import { cachedUid } from "./lib/supabase";
-import type { HoleResult, Player, Round, Star } from "./types";
+import type { CoachAwardKind, HoleResult, Player, Round, Star, TrainingEntry } from "./types";
 import { evaluateRound } from "./rules";
+
+/** Felter man fyller ut ved en ny treningsregistrering (resten settes her). */
+export type NewTrainingEntry = Omit<TrainingEntry, "id" | "created_at" | "deleted">;
 
 export type SyncState = "syncing" | "synced" | "local";
 
@@ -20,6 +23,7 @@ export type SyncState = "syncing" | "synced" | "local";
 export function useApp() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [rounds, setRounds] = useState<Round[]>([]);
+  const [entries, setEntries] = useState<TrainingEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncState, setSyncState] = useState<SyncState>(
     store.backend === "supabase" ? "syncing" : "local",
@@ -35,6 +39,7 @@ export function useApp() {
     const snap = await store.load();
     setPlayers(snap.players);
     setRounds(snap.rounds);
+    setEntries(snap.entries);
     setHcpMap((prev) => {
       const next = { ...prev };
       for (const p of snap.players) if (!(p.id in next)) next[p.id] = getCurrentHcp(p.id);
@@ -127,8 +132,47 @@ export function useApp() {
   const deletePlayer = useCallback(async (id: string): Promise<void> => {
     setPlayers((prev) => prev.filter((p) => p.id !== id));
     setRounds((prev) => prev.filter((r) => r.player_id !== id));
+    setEntries((prev) => prev.filter((e) => e.player_id !== id));
     await store.deletePlayer(id);
   }, []);
+
+  // ─── Trening (manuell registrering) + trenerens merker ──────────────────
+
+  /** Lagre én registrering (optimistisk). Merkene regnes ut fra listen. */
+  const addTrainingEntry = useCallback(async (input: NewTrainingEntry): Promise<TrainingEntry> => {
+    const e: TrainingEntry = { ...input, id: newId(), created_at: new Date().toISOString() };
+    setEntries((prev) => [...prev, e]);
+    applySync((await store.saveEntry(e)).synced);
+    return e;
+  }, []);
+
+  /** Angre = myk sletting. Merker registreringen ga forsvinner av seg selv. */
+  const undoTrainingEntry = useCallback(
+    async (entryId: string): Promise<void> => {
+      const existing = entries.find((e) => e.id === entryId);
+      if (!existing) return;
+      setEntries((prev) => prev.filter((e) => e.id !== entryId));
+      applySync((await store.updateEntry({ ...existing, deleted: true })).synced);
+    },
+    [entries],
+  );
+
+  const awardCoach = useCallback(
+    (playerId: string, award: CoachAwardKind, note: string | null): Promise<TrainingEntry> =>
+      addTrainingEntry({
+        player_id: playerId,
+        kind: "coach",
+        badge_id: "trener",
+        step: null,
+        outcome: null,
+        value_m: null,
+        reference_m: null,
+        series_id: null,
+        award,
+        note,
+      }),
+    [addTrainingEntry],
+  );
 
   const addRound = useCallback(
     async (playerId: string, hcp: number, distance: number, holes: HoleResult[]): Promise<Round> => {
@@ -250,6 +294,10 @@ export function useApp() {
   return {
     players: orderedPlayers,
     rounds,
+    entries,
+    addTrainingEntry,
+    undoTrainingEntry,
+    awardCoach,
     loading,
     syncState,
     reorderPlayers,

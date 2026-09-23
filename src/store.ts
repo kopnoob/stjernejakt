@@ -13,11 +13,14 @@
 //  - Sletting er en LOKAL tombstone (skjuler raden på denne enheten). Raden
 //    blir liggende i Supabase; permanent fjerning gjøres i dashboardet.
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { cachedUid, ensureAuth, getSupabase, supabaseConfigured } from "./lib/supabase";
-import type { Player, Round } from "./types";
+import type { Player, Round, TrainingEntry } from "./types";
 
 const LS_PLAYERS = "sj.players";
 const LS_ROUNDS = "sj.rounds";
+const LS_TRAINING = "sj.training";
+const LS_PENDING_TRAINING_UPD = "sj.pendingTrainingUpd"; // trenings-ids med lokal sletting ikke bekreftet
 const LS_DELETIONS = "sj.deletions"; // string[] av skjulte spiller-id-er
 const LS_CURRENT_HCP = "sj.currentHcp"; // { [playerId]: hcp }
 const LS_PENDING = "sj.pendingSync"; // ids som ennå ikke er bekreftet pushet
@@ -47,6 +50,8 @@ export type Backend = "supabase" | "local";
 export interface Snapshot {
   players: Player[];
   rounds: Round[];
+  /** Treningsregistreringer og trenermerker (uten myk-slettede). */
+  entries: TrainingEntry[];
   /** True hvis vi faktisk fikk data fra skyen (ikke bare cache). */
   syncedRemote: boolean;
 }
@@ -64,6 +69,9 @@ export interface Store {
   saveRound(r: Round): Promise<SaveResult>;
   /** Rediger eller myk-slett (deleted:true) en runde. */
   updateRound(r: Round): Promise<SaveResult>;
+  saveEntry(e: TrainingEntry): Promise<SaveResult>;
+  /** Myk-slett (deleted:true) en treningsregistrering (angre). */
+  updateEntry(e: TrainingEntry): Promise<SaveResult>;
 }
 
 // ─── localStorage-hjelpere ────────────────────────────────────────────────
@@ -129,6 +137,24 @@ export function setPlayerOrder(ids: string[]): void {
   writeLS(LS_ORDER, ids);
 }
 
+// ─── Aktiv spiller i treningsmodus (lokal enhets-preferanse) ─────────────
+
+const LS_TRAINING_PLAYER = "sj.trainingPlayer";
+export function getTrainingPlayer(): string | null {
+  try {
+    return localStorage.getItem(LS_TRAINING_PLAYER);
+  } catch {
+    return null;
+  }
+}
+export function setTrainingPlayer(id: string): void {
+  try {
+    localStorage.setItem(LS_TRAINING_PLAYER, id);
+  } catch {
+    /* ignorer */
+  }
+}
+
 // ─── Tombstones (lokal sletting) ──────────────────────────────────────────
 
 function readDeletions(): string[] {
@@ -150,7 +176,10 @@ class LocalStore implements Store {
     const players = readLS<Player>(LS_PLAYERS).filter((p) => !deleted.has(p.id));
     // Skjul myk-slettede runder (deleted-flagg) i visningen.
     const rounds = readLS<Round>(LS_ROUNDS).filter((r) => !deleted.has(r.player_id) && !r.deleted);
-    return { players, rounds, syncedRemote: false };
+    const entries = readLS<TrainingEntry>(LS_TRAINING).filter(
+      (e) => !deleted.has(e.player_id) && !e.deleted,
+    );
+    return { players, rounds, entries, syncedRemote: false };
   }
 
   async savePlayer(p: Player): Promise<SaveResult> {
@@ -162,6 +191,7 @@ class LocalStore implements Store {
     addDeletion(id);
     writeLS(LS_PLAYERS, readLS<Player>(LS_PLAYERS).filter((p) => p.id !== id));
     writeLS(LS_ROUNDS, readLS<Round>(LS_ROUNDS).filter((r) => r.player_id !== id));
+    writeLS(LS_TRAINING, readLS<TrainingEntry>(LS_TRAINING).filter((e) => e.player_id !== id));
     return { synced: false };
   }
 
@@ -172,6 +202,16 @@ class LocalStore implements Store {
 
   async updateRound(r: Round): Promise<SaveResult> {
     writeLS(LS_ROUNDS, upsertById(readLS<Round>(LS_ROUNDS), r));
+    return { synced: false };
+  }
+
+  async saveEntry(e: TrainingEntry): Promise<SaveResult> {
+    writeLS(LS_TRAINING, upsertById(readLS<TrainingEntry>(LS_TRAINING), e));
+    return { synced: false };
+  }
+
+  async updateEntry(e: TrainingEntry): Promise<SaveResult> {
+    writeLS(LS_TRAINING, upsertById(readLS<TrainingEntry>(LS_TRAINING), e));
     return { synced: false };
   }
 }
@@ -203,6 +243,37 @@ function roundUpdateRow(r: Round) {
     created_at: r.created_at,
     deleted: r.deleted ?? false,
   };
+}
+
+/** Felter i training_entries-tabellen. */
+function entryRow(e: TrainingEntry) {
+  return {
+    id: e.id,
+    player_id: e.player_id,
+    kind: e.kind,
+    badge_id: e.badge_id,
+    step: e.step,
+    outcome: e.outcome,
+    value_m: e.value_m,
+    reference_m: e.reference_m,
+    series_id: e.series_id,
+    award: e.award,
+    note: e.note,
+    created_at: e.created_at,
+    deleted: e.deleted ?? false,
+  };
+}
+
+function addPending(key: string, id: string): void {
+  const set = new Set(readLS<string>(key));
+  set.add(id);
+  writeLS(key, [...set]);
+}
+function removePending(key: string, id: string): void {
+  writeLS(
+    key,
+    readLS<string>(key).filter((x) => x !== id),
+  );
 }
 
 function addPendingUpd(id: string): void {
@@ -250,10 +321,14 @@ class SupabaseStore implements Store {
       writeLS(LS_PLAYERS, merged.players);
       writeLS(LS_ROUNDS, merged.rounds);
       writeLS(LS_PENDING, []);
+      // Trening synkes for seg: mangler tabellen (migrering ikke kjørt ennå),
+      // skal spillere og runder fortsatt synke som før.
+      const entries = await this.syncTraining(sb, deleted);
       // Skjul myk-slettede runder i visningen (men behold dem i cachen).
       return {
         players: merged.players,
         rounds: merged.rounds.filter((r) => !r.deleted),
+        entries,
         syncedRemote: true,
       };
     } catch (e) {
@@ -325,6 +400,75 @@ class SupabaseStore implements Store {
     // RLS tillater ikke delete for anon — sletting er lokal skjuling.
     await this.cache.deletePlayer(id);
     return { synced: false };
+  }
+
+  async saveEntry(e: TrainingEntry): Promise<SaveResult> {
+    await this.cache.saveEntry(e);
+    return this.tryInsert("training_entries", entryRow(e), e.id);
+  }
+
+  async updateEntry(e: TrainingEntry): Promise<SaveResult> {
+    await this.cache.updateEntry(e);
+    const sb = await getSupabase();
+    if (!sb) {
+      addPending(LS_PENDING_TRAINING_UPD, e.id);
+      return { synced: false };
+    }
+    await ensureAuth();
+    try {
+      const { error } = await sb.from("training_entries").update({ deleted: e.deleted ?? false }).eq("id", e.id);
+      if (error) throw error;
+      removePending(LS_PENDING_TRAINING_UPD, e.id);
+      return { synced: true };
+    } catch (err) {
+      addPending(LS_PENDING_TRAINING_UPD, e.id);
+      logSync("angre trening feilet (synkes senere)", err);
+      return { synced: false };
+    }
+  }
+
+  /**
+   * Hent treningsregistreringer, push lokale som mangler og ventende
+   * angringer, og returner sammenslått liste. Faller tilbake til lokal
+   * cache ved feil (f.eks. hvis tabellen ikke finnes ennå).
+   */
+  private async syncTraining(sb: SupabaseClient, deletedPlayers: Set<string>): Promise<TrainingEntry[]> {
+    const local = readLS<TrainingEntry>(LS_TRAINING).filter((e) => !deletedPlayers.has(e.player_id));
+    try {
+      const { data, error } = await sb
+        .from("training_entries")
+        .select("*")
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      const remote = ((data ?? []) as TrainingEntry[]).filter((e) => !deletedPlayers.has(e.player_id));
+
+      const missing = local.filter((e) => !remote.some((r) => r.id === e.id));
+      if (missing.length) {
+        const { error: ie } = await sb
+          .from("training_entries")
+          .upsert(missing.map(entryRow), { onConflict: "id", ignoreDuplicates: true });
+        if (ie) throw ie;
+        remote.push(...missing);
+      }
+
+      const stillPending: string[] = [];
+      for (const id of readLS<string>(LS_PENDING_TRAINING_UPD)) {
+        const e = local.find((x) => x.id === id);
+        if (!e) continue;
+        const idx = remote.findIndex((x) => x.id === id);
+        if (idx >= 0) remote[idx] = e;
+        else remote.push(e);
+        const { error: ue } = await sb.from("training_entries").update({ deleted: e.deleted ?? false }).eq("id", id);
+        if (ue) stillPending.push(id);
+      }
+      writeLS(LS_PENDING_TRAINING_UPD, stillPending);
+
+      writeLS(LS_TRAINING, remote);
+      return remote.filter((e) => !e.deleted);
+    } catch (e) {
+      logSync("trening-synk feilet, bruker lokal cache", e);
+      return local.filter((x) => !x.deleted);
+    }
   }
 
   private async tryInsert(table: string, row: object, id: string): Promise<SaveResult> {

@@ -1,5 +1,5 @@
 interface Props {
-  name: "back" | "more" | "share" | "flight" | "trophy" | "user" | "up" | "down" | "info";
+  name: "back" | "more" | "share" | "flight" | "trophy" | "user" | "up" | "down" | "info" | "target";
   size?: number;
 }
 
@@ -59,6 +59,13 @@ export default function Icon({ name, size = 24 }: Props) {
           <path d="M12 13.5V17" />
           <path d="M8.5 20h7" />
           <path d="M9.5 20l.5-3h4l.5 3" />
+        </>
+      )}
+      {name === "target" && (
+        <>
+          <circle cx="12" cy="12" r="9" />
+          <circle cx="12" cy="12" r="5" />
+          <circle cx="12" cy="12" r="1.2" />
         </>
       )}
       {name === "user" && (

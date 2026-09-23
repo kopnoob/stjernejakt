@@ -47,6 +47,39 @@ export interface Round {
   deleted?: boolean;
 }
 
+// ─── Trening (range, chipping-green, putting-green) ───────────────────────
+
+/** Resultat av ett forsøk i en serie. «holed» = chip rett i hull. */
+export type TrainingOutcome = "hit" | "miss" | "holed";
+
+export type CoachAwardKind = "innsats" | "lagkamerat" | "mot" | "fremgang";
+
+/**
+ * Én manuell registrering på treningsfeltet (kind = "attempt"), eller et
+ * trenermerke (kind = "coach"). Merkene regnes ut fra disse radene — de
+ * lagres ikke selv. Insert-only som runder; angre = myk sletting.
+ */
+export interface TrainingEntry {
+  id: string;
+  player_id: string;
+  kind: "attempt" | "coach";
+  /** Øvelse (rakett, laser, …) eller «trener». */
+  badge_id: string;
+  /** Trinn 1–7 som ble forsøkt (serier). */
+  step: number | null;
+  outcome: TrainingOutcome | null;
+  /** Rakett: total lengde i meter. */
+  value_m: number | null;
+  /** Laser: oppgitt lengde. Blink: mållengde. */
+  reference_m: number | null;
+  /** Grupperer forsøk i én serie (3 av 5 teller innen serien). */
+  series_id: string | null;
+  award: CoachAwardKind | null;
+  note: string | null;
+  created_at: string;
+  deleted?: boolean;
+}
+
 /** Én celle i stjerne-matrisen (hcp × avstand). */
 export interface MatrixCell {
   hcp: number;

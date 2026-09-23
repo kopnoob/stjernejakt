@@ -7,10 +7,12 @@ import FlightRound from "./screens/FlightRound";
 import Tournaments from "./screens/Tournaments";
 import Tournament from "./screens/Tournament";
 import ShareClaim from "./screens/ShareClaim";
+import Training from "./screens/Training";
 import { useApp } from "./useApp";
 import { hcpProgress } from "./rules";
 import { newlyUnlocked } from "./lib/badges";
 import { DEFAULT_HCP } from "./types";
+import { setTrainingPlayer } from "./store";
 
 type View =
   | { name: "players" }
@@ -21,7 +23,8 @@ type View =
   | { name: "flightRound"; playerIds: string[] }
   | { name: "tournaments" }
   | { name: "tournament"; id: string }
-  | { name: "share"; token: string };
+  | { name: "share"; token: string }
+  | { name: "training"; exerciseId: string | null };
 
 // ─── Hash-routing (F6) ──────────────────────────────────────────────────────
 // Hash-basert ruting gjør nettleserens tilbake-knapp ekte (hvert skjerm-bytte
@@ -31,12 +34,16 @@ type View =
 //   #/p/<id>/r/<hcp>/<dist>    → aktiv runde
 //   #/flight                   → velg flight (spillere + avstand)
 //   #/flight/r/<dist>/<ids>    → flight-runde (ids = komma-separert)
+//   #/trening[/<øvelse>]       → trening på range/chipping/putting
 
 function parseHash(): View {
   const raw = location.hash.replace(/^#\/?/, "");
   const parts = raw.split("/").filter(Boolean);
   if (parts[0] === "share" && parts[1]) {
     return { name: "share", token: parts[1] };
+  }
+  if (parts[0] === "trening") {
+    return { name: "training", exerciseId: parts[1] ?? null };
   }
   if (parts[0] === "turnering") {
     if (parts[1]) return { name: "tournament", id: parts[1] };
@@ -69,6 +76,7 @@ function toHash(v: View): string {
   if (v.name === "tournaments") return "#/turnering";
   if (v.name === "tournament") return `#/turnering/${v.id}`;
   if (v.name === "share") return `#/share/${v.token}`;
+  if (v.name === "training") return v.exerciseId ? `#/trening/${v.exerciseId}` : "#/trening";
   return "#/";
 }
 
@@ -122,6 +130,7 @@ export default function App() {
         onAdd={app.addPlayer}
         onFlight={() => navigate({ name: "flight" })}
         onTournament={() => navigate({ name: "tournaments" })}
+        onTraining={() => navigate({ name: "training", exerciseId: null })}
         onRecover={app.recover}
         onReorder={app.reorderPlayers}
       />
@@ -135,6 +144,22 @@ export default function App() {
         onClaim={app.claimShare}
         onOpen={(playerId) => navigate({ name: "board", playerId })}
         onHome={() => navigate({ name: "players" })}
+      />
+    );
+  }
+
+  if (view.name === "training") {
+    return (
+      <Training
+        players={app.players}
+        rounds={app.rounds}
+        entries={app.entries}
+        exerciseId={view.exerciseId}
+        onOpenExercise={(exerciseId) => navigate({ name: "training", exerciseId })}
+        onHome={() => navigate({ name: "players" })}
+        onAdd={app.addTrainingEntry}
+        onUndo={app.undoTrainingEntry}
+        onAward={app.awardCoach}
       />
     );
   }
@@ -214,6 +239,7 @@ export default function App() {
       <PlayerBoard
         player={player}
         rounds={app.rounds}
+        entries={app.entries}
         currentHcp={app.getHcp(player.id)}
         onBack={() => navigate({ name: "players" })}
         onStart={(hcp, distance) => navigate({ name: "round", playerId: player.id, hcp, distance })}
@@ -221,6 +247,12 @@ export default function App() {
         onShareAccess={() => app.shareLink(player.id)}
         onEditRound={(roundId) => navigate({ name: "editRound", playerId: player.id, roundId })}
         onDeleteRound={app.deleteRound}
+        onTrain={() => {
+          setTrainingPlayer(player.id);
+          navigate({ name: "training", exerciseId: null });
+        }}
+        onAward={(award, note) => app.awardCoach(player.id, award, note)}
+        onDeleteEntry={app.undoTrainingEntry}
         onDelete={async () => {
           await app.deletePlayer(player.id);
           navigate({ name: "players" });
@@ -253,6 +285,7 @@ export default function App() {
   // view.name === "round"
   const roundHcp = view.hcp ?? DEFAULT_HCP;
   const playerRounds = app.rounds.filter((r) => r.player_id === player.id);
+  const playerEntries = app.entries.filter((e) => e.player_id === player.id);
   const recordsByDistance = hcpProgress(playerRounds, roundHcp).bestGoldStrokesByDistance;
   return (
     <Round
@@ -263,7 +296,7 @@ export default function App() {
       onSave={async (hcp, distance, holes) => {
         // H4: hvilke merker låste denne runden opp? (før vs etter)
         const newRound = await app.addRound(player.id, hcp, distance, holes);
-        return newlyUnlocked(playerRounds, [...playerRounds, newRound]);
+        return newlyUnlocked(playerRounds, [...playerRounds, newRound], playerEntries);
       }}
       onBack={() => navigate({ name: "board", playerId: player.id })}
     />

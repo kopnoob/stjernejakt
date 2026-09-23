@@ -19,11 +19,12 @@ interface Props {
   onAdd: (name: string, color: string, avatar: string | null) => Promise<Player>;
   onFlight: () => void;
   onTournament: () => void;
+  onTraining: () => void;
   onRecover: (code: string) => Promise<number>;
   onReorder: (ids: string[]) => void;
 }
 
-export default function Players({ players, rounds, backend, syncState, getHcp, onOpen, onAdd, onFlight, onTournament, onRecover, onReorder }: Props) {
+export default function Players({ players, rounds, backend, syncState, getHcp, onOpen, onAdd, onFlight, onTournament, onTraining, onRecover, onReorder }: Props) {
   const [sorting, setSorting] = useState(false);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
@@ -251,6 +252,10 @@ export default function Players({ players, rounds, backend, syncState, getHcp, o
 
         {!sorting && !adding && players.length >= 1 && (
           <>
+            <button className="btn btn-flight" onClick={onTraining}>
+              <Icon name="target" size={20} />
+              Trening: range, chipping og putting
+            </button>
             <div className={`entry-row ${players.length < 2 ? "is-locked" : ""}`}>
               <button
                 className="btn btn-flight"

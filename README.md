@@ -35,6 +35,46 @@ Du kan også se en **historikk** per spiller og dele et **diplom** med fremgange
 
 ---
 
+## Trening og merker (golfbagen)
+
+Fra forsiden (**Trening**) eller spillerkortet kan du registrere trening på
+driving range, chipping-green og putting-green. Alt tastes manuelt: total
+lengde (Rakett) eller ett trykk per ball (treff/bom). Bytt mellom barna med
+ett trykk — hver har sin egen serie.
+
+- **Sju trinn i kjeglefargene** (grønn → hvit → gul → blå → oransje → svart →
+  rosa). Merket skifter farge når barnet blir bedre.
+- **3 av 5:** de siste fem ballene i serien teller hele tiden, så en bom
+  nullstiller aldri noe. Trinnet kommer i det tredje treffet.
+- **Golfbagen** (fanen «Merker») viser bare det som er oppnådd. Uprøvde
+  områder er et «?», og hemmelige merker telles men listes aldri.
+- **Trenerens merke** (Innsats, God lagkamerat, Mot, Fremgang) deles ut fra
+  treningsskjermen eller spillerens «⋯»-meny.
+
+| Merke | Område | Regel | Trinn 1 → 7 |
+|---|---|---|---|
+| 🚀 Rakett | Range | Lengste slag, total lengde | 30 · 50 · 70 · 90 · 110 · 130 · 150 m |
+| 🏹 Laser | Range | 3 av 5 innenfor korridor (± % av oppgitt lengde) | 25 · 20 · 15 · 12 · 10 · 8 · 6 % |
+| 🎯 Blink | Range | 3 av 5 innenfor ± % av mållengden | 20 · 15 · 12 · 10 · 8 · 6 · 5 % |
+| 🧲 Magnet | Chipping | 3 av 5 innenfor 2 (så 1) køllelengder | 5/10/15 m, så 5/10/15/20 m |
+| ⛳ Plopp | Putting | 3 av 5 i hull | 0,5 · 1 · 1,5 · 2 · 2,5 · 3 · 4 m |
+| 🪶 Fjærlett | Putting | 3 av 5 innenfor én putterlengde | 3 · 5 · 7 · 9 · 11 · 13 · 15 m |
+| 🗓️ Trofast | Alle | Dager med spill eller trening | 3 · 5 · 10 · 15 · 20 · 30 · 50 |
+
+Engangsmerker: Oppdager, Chip-in, Stå-på og Drømmeslag (de tre siste er
+hemmelige), pluss Stjernejakt-merkene Første gull, Helt handicap, 10 gull og
+Hat trick. Tersklene ligger i [`src/lib/achievements.ts`](src/lib/achievements.ts).
+
+Merkene regnes ut fra registreringene (ingenting «oppnådd» lagres), så
+**Angre siste** fjerner også merket den registreringen ga.
+
+> **Supabase:** kjør migrasjonen
+> [`20260923120000_training_entries.sql`](supabase/migrations/20260923120000_training_entries.sql)
+> for å synke treningen mellom enheter. Før den er kjørt lagres treningen
+> bare lokalt på enheten, mens spillere og runder synker som før.
+
+---
+
 ## Datalagring
 
 Appen er **offline-først**: alt lagres umiddelbart lokalt på enheten, så

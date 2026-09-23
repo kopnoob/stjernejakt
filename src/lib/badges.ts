@@ -1,66 +1,50 @@
-// H4: Milepæl-merker (badges). Avledes rent fra spillerens runder — ingen ny
-// lagring trengs. Brukes både i spiller-boardet (rad med opptjente/låste merker)
-// og i feiringen (når en runde nettopp låste opp et merke).
+// Merker i Stjernejakt-feiringen. Reglene ligger i achievements.ts
+// (golfbagen); dette er et tynt lag i formatet ResultOverlay bruker.
 
-import type { Round } from "../types";
-import { HCP_RANGE } from "../types";
-import { hcpProgress } from "../rules";
+import type { Round, TrainingEntry } from "../types";
+import { STEP_NAMES, computeBag, getAchievement, isLadder, newlyEarned, type EarnedItem } from "./achievements";
 
 export interface BadgeDef {
   id: string;
   emoji: string;
   label: string;
-  /** Hvordan merket låses opp (vises på låste merker). */
+  /** Hva merket betyr. */
   hint: string;
 }
 
-export const BADGES: BadgeDef[] = [
-  { id: "first-gold", emoji: "🥇", label: "Første gull", hint: "Få din aller første gullstjerne." },
-  {
-    id: "hcp-complete",
-    emoji: "🏅",
-    label: "Helt handicap",
-    hint: "Gull på alle sju utslag i ett handicap.",
-  },
-  { id: "ten-gold", emoji: "🌟", label: "10 gull", hint: "Samle 10 gullstjerner til sammen." },
-  { id: "hat-trick", emoji: "🔥", label: "Hat trick", hint: "Tre gull på samme dag." },
-];
+const STJERNEJAKT_IDS = ["first-gold", "hcp-complete", "ten-gold", "hat-trick"];
 
-/** Stabil «dag»-nøkkel i lokal tid (grupperer økter på samme dato). */
-function dayKey(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+export const BADGES: BadgeDef[] = STJERNEJAKT_IDS.map((id) => {
+  const def = getAchievement(id)!;
+  return { id, emoji: def.emoji, label: def.name, hint: def.description };
+});
+
+function toBadgeDef(item: EarnedItem): BadgeDef {
+  const ladder = isLadder(item.def);
+  return {
+    id: ladder ? `${item.def.id}:${item.step}` : item.def.id,
+    emoji: item.def.emoji,
+    label: ladder ? `${item.def.name} ${STEP_NAMES[item.step - 1]}` : item.def.name,
+    hint: item.def.description,
+  };
 }
 
-/** Sett med opptjente merke-id-er for en spillers runder. */
+/** Sett med opptjente Stjernejakt-merker for en spillers runder. */
 export function earnedBadges(rounds: Round[]): Set<string> {
-  const earned = new Set<string>();
-  const golds = rounds.filter((r) => r.star === "gold");
-
-  if (golds.length >= 1) earned.add("first-gold");
-  if (golds.length >= 10) earned.add("ten-gold");
-
-  for (const h of HCP_RANGE) {
-    if (hcpProgress(rounds, h).completed) {
-      earned.add("hcp-complete");
-      break;
-    }
-  }
-
-  const byDay = new Map<string, number>();
-  for (const r of golds) {
-    const n = (byDay.get(dayKey(r.created_at)) ?? 0) + 1;
-    byDay.set(dayKey(r.created_at), n);
-    if (n >= 3) earned.add("hat-trick");
-  }
-
-  return earned;
+  const bag = computeBag(rounds, []);
+  return new Set(STJERNEJAKT_IDS.filter((id) => bag.badges[id].level > 0));
 }
 
-/** Merker som ble låst opp ved overgangen fra `before`-runder til `after`-runder. */
-export function newlyUnlocked(before: Round[], after: Round[]): BadgeDef[] {
-  const had = earnedBadges(before);
-  const has = earnedBadges(after);
-  return BADGES.filter((b) => has.has(b.id) && !had.has(b.id));
+/**
+ * Merker som ble låst opp ved overgangen fra `before`- til `after`-runder
+ * (inkl. Trofast, Oppdager og Drømmeslag). For stiger vises bare høyeste nye trinn.
+ */
+export function newlyUnlocked(before: Round[], after: Round[], entries: TrainingEntry[] = []): BadgeDef[] {
+  const items = newlyEarned(computeBag(before, entries), computeBag(after, entries));
+  const top = new Map<string, EarnedItem>();
+  for (const item of items) {
+    const cur = top.get(item.def.id);
+    if (!cur || item.step > cur.step) top.set(item.def.id, item);
+  }
+  return [...top.values()].map(toBadgeDef);
 }
